@@ -1,2 +1,2 @@
 # bonter
-A Platform for easly building
+A Platform for easly building bot.
