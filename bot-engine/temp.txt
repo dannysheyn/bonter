@@ -1,0 +1,7 @@
+from io import BytesIO
+
+response = requests.get("https://i.imgur.com/ExdKOOz.png%22)
+image_bytes = io.BytesIO(response.content)
+
+img = PIL.Image.open(image_bytes)
+img.show()
