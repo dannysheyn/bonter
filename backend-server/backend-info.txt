@@ -1,0 +1,1 @@
+all routes are manneged in the site_server/ views file.
