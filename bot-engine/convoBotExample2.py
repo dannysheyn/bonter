@@ -163,7 +163,6 @@ def end(update: Update, context: CallbackContext) -> None:
 
     text = 'See you around!'
     update.callback_query.edit_message_text(text=text)
-
     return END
 
 
