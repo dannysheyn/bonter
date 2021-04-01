@@ -9,9 +9,13 @@ Send /start to initiate the conversation.
 Press Ctrl-C on the command line or send a signal to the process to stop the
 bot.
 """
+
 #TODO: how fork the conversation, bot is made after conversation or on the go?, make the bot with all the user defined options, how to run the bot -- (run with new features?)
 #TODO: api integration tool?
 #TODO: wrapper class of all api's for all bots according to contex
+#TODO: asking the user questing about the bot, in form for ex4 guy ronen, build the state object conneting the states according to the asnwers of the user. /
+# divided to two parts asking the user a question about the bot interface and then asking the user about the content.
+
 import logging
 
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
@@ -179,7 +183,6 @@ if __name__ == '__main__':
 
 
 ''':key
-    
     '^(Boy|Girl|Other)$'
     def start(update: Update, context: CallbackContext) -> int:
     reply_keyboard = [['Product', 'Opening Times', 'Other']]

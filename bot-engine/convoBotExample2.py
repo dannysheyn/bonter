@@ -356,7 +356,7 @@ def main():
     )
 
     # Set up top level ConversationHandler (selecting action)
-    # Because the states of the third level conversation map to the ones of the econd level
+    # Because the states of the third level conversation map to the ones of the Second level
     # conversation, we need to make sure the top level conversation can also handle them
     selection_handlers = [
         add_member_conv,

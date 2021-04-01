@@ -36,13 +36,18 @@ GET_API_KEY, PHOTO, LOCATION, BIO = range(4)
 
 def start(update: Update, context: CallbackContext) -> int:
     update.message.reply_text('Please enter the api key')
+    first_words = update.message.from_user
     return GET_API_KEY
 
 def get_api_key(update: Update, context: CallbackContext) -> int:
     api_key = update.message.text
     #TODO: save the api in a database? activate the bot?
     update.message.reply_text('Please enter the first suggested clickable keywords')
-    return GET_API_KEY
+    api_key = update.message.text
+    handle_update()
+    api_key = update.message.text
+    api_key = update.message.text
+    return PHOTO
 
 def new_user_defined_event_handler(update: Update, context: CallbackContext): #bot main menu
     reply_keyboard = [['Add new event handler', 'Add Poll', 'Add new API request/event', 'Help']]
@@ -159,7 +164,7 @@ def main() -> None:
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
-            get_api_key: [MessageHandler(Filters.all, get_api_key)],
+            GET_API_KEY: [MessageHandler(Filters.all, get_api_key)],
             PHOTO: [MessageHandler(Filters.photo, photo), CommandHandler('skip', skip_photo)],
             LOCATION: [
                 MessageHandler(Filters.location, location),
@@ -180,6 +185,10 @@ def main() -> None:
     # SIGTERM or SIGABRT. This should be used most of the time, since
     # start_polling() is non-blocking and will stop the bot gracefully.
     updater.idle()
+
+
+if __name__ == '__main__':
+    main()
 
 ''':key
     
