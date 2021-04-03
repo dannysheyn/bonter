@@ -9,6 +9,8 @@ from telegram.ext import (
     Handler, CallbackQueryHandler,
 )
 import requests
+import threading
+import os
 
 
 # TODO NEXT TIME: add queryHandler to our bot can be hardcoded. checks and optimizations,
@@ -25,10 +27,11 @@ class CallablePrint:
         self.replay_buttons.append(button)
 
     def __call__(self, update: Update, context: CallbackContext):
-        keyboard = None
+        update.message.reply_text(text=self.msg)
         if self.replay_buttons:
+            print(self.replay_buttons)
             keyboard = InlineKeyboardMarkup(self.replay_buttons)
-        update.message.reply_text(text=self.msg, reply_markup=keyboard)
+            update.message.reply_text(text="What would you like to do next", reply_markup=keyboard)
         return self.next_state
 
 
@@ -56,14 +59,18 @@ class BotEngine:
         self.generated_bots = {}  # {'artem' : UserGeneratedBot() , 'daniel': UserGeneratedBot() }
         self.invalid_param = None
 
+
     def add_handler_entry_points(self, command_handler: Handler):
         self.conv_handler._entry_points.append(command_handler)
+
 
     def add_handler_states(self, user_defined_handler: Handler, handler_id: object):
         self.conv_handler._states[handler_id].append()
 
+
     def add_handler_fallbacks(self, user_defined_handler: Handler):
         self.conv_handler.fallbacks.append(user_defined_handler)
+
 
     def make_new_bot(self):
         created_bot = UserGeneratedBot()
@@ -84,6 +91,7 @@ class BotEngine:
             update.message.reply_text('You have entered a wrong api key, please enter a valid one.')
             return GET_API_KEY
 
+
     def invalid_state_manegment(self, update: Update, context: CallbackContext):
         if self.invalid_param == 'API':
             update.message.reply_text('You have entered a wrong api key, please enter a valid one.')
@@ -92,20 +100,30 @@ class BotEngine:
     def define_bot_start(self, update: Update, context: CallbackContext):
         first_words = update.message.text
         return_key = self.generated_bots[update.effective_user.id].state_keys
-        self.generated_bots[update.effective_user.id].entry_point = [
+        self.generated_bots[update.effective_user.id].entry_points = [
             CommandHandler('start', CallablePrint(first_words, return_key))]
         # self.generated_bots[update.effective_user.id].state_keys += 1
         update.message.reply_text('Please enter a command that the bot will respond to (will be shown as a button)')
         return ADD_COMMAND
 
     def ask_command(self, update: Update, context: CallbackContext):
-        update.message.reply_text('Please enter a command that the bot will respond to (will be shown as a button)')
+        query = update.callback_query
+        query.answer()
+        query.edit_message_text('Currently the bot knows this commands')
+        counter = 0
+        message = ""
+        for command in self.generated_bots[update.effective_user.id].commands:
+            message += f"{counter}. {command}\n"
+            counter += 1
+
+        query.message.reply_text(text=message)
+        query.message.reply_text('Please type a new command that the bot will respond to (will be shown as a button)')
         return ADD_COMMAND
 
     def add_command(self, update: Update, context: CallbackContext):
         command = update.message.text
         self.generated_bots[update.effective_user.id].commands.append(command)
-        update.message.reply_text('What will the bot will answer to this command?')
+        update.message.reply_text('What will the bot answer to this command?')
         return ADD_RESPONSE
 
     def add_response(self, update: Update, context: CallbackContext):
@@ -117,40 +135,57 @@ class BotEngine:
         if last_key not in user_generated_bot.states:
             user_generated_bot.states[last_key] = []
         user_generated_bot.states[last_key].append(keyboard_callback)
-        self.generated_bots[update.effective_user.id].entry_point[0].callback.add_button(
+        self.generated_bots[update.effective_user.id].entry_points[0].callback.add_button(
             InlineKeyboardButton(text=last_command, callback_data=str(user_generated_bot.button_key))
         )
         user_generated_bot.button_key += 1
-        return MENU
-
-    def main_menu(self, update: Update, context: CallbackContext):
-        # build menu for user who is building the bot
-        menu_text = 'what do you want to do next? ?\n' \
+        menu_text = 'what do you want to do next?\n' \
                     'please choose one of the following:'
-        menu_buttons = [[InlineKeyboardButton(text='add new command', callback_data=str(ASK_COMMAND))],
-                        [InlineKeyboardButton(text='end building bot', callback_data=str(END))]]
+        menu_buttons = [[InlineKeyboardButton(text='Add new command', callback_data=str(ASK_COMMAND))],
+                        [InlineKeyboardButton(text='End building bot', callback_data=str(END))]]
         menu_keyboard = InlineKeyboardMarkup(menu_buttons)
         update.message.reply_text(text=menu_text, reply_markup=menu_keyboard)
+        return SELECTION
+
+    def main_menu(self, update: Update, context: CallbackContext):
+        query = update.callback_query
+        query.annswer()
+
         #update.callback_query.answer()
         #update.callback_query.edit_message_text(text=menu_text, reply_markup=menu_keyboard)
         return MENU
 
     def end_build_bot(self, update: Update, context: CallbackContext):
+        query = update.callback_query
+        query.answer()
+
         user_generated_bot = self.generated_bots[update.effective_user.id]
         user_generated_bot.updater = Updater(user_generated_bot.bot_api_key, use_context=True)
         user_generated_bot.dispatcher = user_generated_bot.updater.dispatcher
         user_generated_bot.conv_handler = ConversationHandler(
             entry_points=user_generated_bot.entry_points,
             states=user_generated_bot.states,
-            fallbacks=[CommandHandler('cancel', self.generated_bots[update.effective_user.id].entry_point[0])],
+            fallbacks=[CommandHandler('cancel', self.generated_bots[update.effective_user.id].entry_points[0])],
         )
-        text = f"Your bot is now initialized! click the link to interact with your bot!" \
+        text = f"Your bot is now initialized! click the link to interact with your bot!\n" \
                f"http://telegram.me/{user_generated_bot.bot_username}"
-        update.message.reply_text(text=text)
+        menu_buttons = [[InlineKeyboardButton(text='Create a new Bot', callback_data=str(GET_API_KEY))]]
+        menu_keyboard = InlineKeyboardMarkup(menu_buttons)
+
+        query.message.reply_text(text=text, reply_markup=menu_keyboard)
+        user_generated_bot.dispatcher.add_handler(user_generated_bot.conv_handler)
+        user_generated_bot.updater.start_polling()
+        #user_generated_bot.updater.idle()
+
+        # new_bot = threading.Thread(target=self.start_user_bot, args=(user_generated_bot,))
+        # new_bot.start()
+
+        return START_AGAIN  # Todo: change
+
+    def start_user_bot(self, user_generated_bot):
         user_generated_bot.dispatcher.add_handler(user_generated_bot.conv_handler)
         user_generated_bot.updater.start_polling()
         user_generated_bot.updater.idle()
-        return MENU  # Todo: change
 
     def is_valid_API_key(self, api_key, user_id):
         check_url = f'https://api.telegram.org/bot{api_key}/getMe'
@@ -160,6 +195,11 @@ class BotEngine:
             return True
         else:
             return False
+
+    def start_over(self, update:Update, context: CallbackContext):
+        query = update.callback_query
+        query.answer()
+        self.start(query, context)
 
 
 ADD_START = 1
@@ -171,10 +211,11 @@ ADD_RESPONSE = 6
 MENU = 7
 END = 8
 ASK_COMMAND = 9
-
+SELECTION = 10
+START_AGAIN = 11
 
 def main():
-    mainbot = BotEngine(bot_name='engineBot', bot_api_key="1489264800:AAEgoIvqwoN3K1UZL6ghTY5ixZvUcl6qI_E",
+    mainbot = BotEngine(bot_name='engineBot', bot_api_key="1743828272:AAF_0DG0-bjmp5nb6TvjcaYXU08EHvTchQQ",
                         conv_handler=None)
     dispatcher = mainbot.updater.dispatcher
     conv_handler = ConversationHandler(
@@ -182,17 +223,21 @@ def main():
         states={
             GET_API_KEY: [MessageHandler(Filters.text, mainbot.get_api_key)],
             ADD_START: [MessageHandler(Filters.text, mainbot.define_bot_start)],
-            ASK_COMMAND: [MessageHandler(Filters.text, mainbot.ask_command)],
+            SELECTION: [
+                CallbackQueryHandler(mainbot.ask_command, pattern='^' + str(ASK_COMMAND) + '$'),
+                CallbackQueryHandler(mainbot.end_build_bot, pattern='^' + str(END) + '$')
+                # ASK_COMMAND: [MessageHandler(Filters.text, mainbot.ask_command)],
+                # END: [MessageHandler(Filters.text, mainbot.end_build_bot)]
+            ],
             ADD_COMMAND: [MessageHandler(Filters.text, mainbot.add_command)],
             ADD_RESPONSE: [MessageHandler(Filters.text, mainbot.add_response)],
-            MENU: [MessageHandler(Filters.text, mainbot.main_menu)],
-            END: [MessageHandler(Filters.text, mainbot.end_build_bot)],
+            START_AGAIN: [CallbackQueryHandler(mainbot.start_over, pattern='^' + str(START_AGAIN) + '$')],
         },
         fallbacks=[CommandHandler('cancel', mainbot.start)],
     )
     dispatcher.add_handler(conv_handler)
     mainbot.updater.start_polling()
-    mainbot.updater.idle()
+    # mainbot.updater.idle()
 
 
 if __name__ == '__main__':
