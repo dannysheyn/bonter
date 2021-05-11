@@ -10,8 +10,10 @@ from telegram.ext import (
 )
 import requests
 from callback import *
+import re
 import threading
 import os
+
 
 # TODO: Flights, RSS,Group chats + bots,Group Notification, Basic Api integrations with calender, gmail and more., Polls, Order bot? ,data to Graps , predefined demos
 # TODO: 1) fix the code.
@@ -27,23 +29,20 @@ import os
 # 3) command type
 # 4) better UX/UI - improve botEngine convo and user freindly
 # 5) DB
-#press here to learn more
+# press here to learn more
 
+# Plan: mannage one state with multipyl callbackquery handlers
+#
+#
 
 class CallablePrint:
-    def __init__(self, msg, next_state, replay_buttons=None):
+    def __init__(self, msg):
         self.msg = msg
-        self.next_state = next_state
-        self.replay_buttons = replay_buttons
+        self.next_state = 1
+        self.reply_buttons = []
 
     def add_button(self, button):
-        if self.replay_buttons is None:
-            replay_buttons = [button]
-        elif isinstance(self.replay_buttons, str):
-            temp = self.replay_buttons
-            self.replay_buttons = [temp, button]
-        else:
-            self.replay_buttons.append(button)
+        self.reply_buttons.append(button)
 
     def check_query(self, update: Update, context: CallbackContext):
         query = update.callback_query
@@ -56,9 +55,9 @@ class CallablePrint:
     def __call__(self, update: Update, context: CallbackContext):
         update = self.check_query(update, context)
         update.message.reply_text(text=self.msg)
-        if self.replay_buttons:
-            print(self.replay_buttons)
-            keyboard = ReplyKeyboardMarkup(self.replay_buttons)
+        if self.reply_buttons:
+            print(self.reply_buttons)
+            keyboard = ReplyKeyboardMarkup(self.reply_buttons)
             text = "What would you like to do next"
             update.message.reply_text(text=text, reply_markup=keyboard)
         return self.next_state
@@ -93,6 +92,7 @@ class CallableAPI:
             update.message.reply_text(text=text, reply_markup=keyboard)
         return self.next_state
 
+
 # class CallableAPI(CallablePrint):
 #     def __init__(self, api_url, key, msg, next_state):
 #         super(CallableAPI, self).__init__()
@@ -108,9 +108,12 @@ class UserGeneratedBot:
         self.entry_points = []  # build on the go /start /hi
         self.states = {}  # build on the go
         self.fallbacks = []  # build on the go
-        self.state_keys = 0
+        self.state_key = 1
         self.commands = []
         self.button_key = 0
+        self.build_button = {}
+        self.edges = set()
+        self.pattern = 0
 
     def add_new_command(self):
         if self.state_keys not in self.states:
@@ -122,6 +125,33 @@ class UserGeneratedBot:
         self.states[state_key].append(
             CallbackQueryHandler(callback, pattern='^' + str(self.button_key) + '$')
         )
+
+        # fromBox = (1 ,2 ) => from box 1 button 2 (1.2) to destBox
+                    #(1,2), 2  1.2->2
+    def add_edge(self, fromBox: tuple, destinationBox):
+        # self.edges.add((1, 2, 2))
+        box = fromBox[0] - 1
+        from_button = fromBox[1] - 1
+        box_callback = self.states[self.state_key][box].callback
+        box_buttons = box_callback.reply_buttons
+        inlinekeyBoard = box_buttons[from_button]
+        inlinekeyBoard.callback_data = str(destinationBox - 1)
+
+    def add_box(self, box_msg):
+        self.states[self.state_key].append(
+            CallbackQueryHandler(CallablePrint(msg=box_msg),
+                                 pattern='^' + str(self.pattern) + '$')
+        )
+        self.pattern += 1
+        return self.pattern
+
+    def add_box_button(self, box_number, button_text):
+        callbackqueryArray = self.states[self.state_key]
+        box_number -= 1
+        callbackqueryArray[box_number].callback.add_button(
+            InlineKeyboardButton(button_text)
+        )
+
 
     # def print_conversation(self):
     #     conversetion = ''
@@ -190,10 +220,20 @@ class BotEngine:
         first_words = update.message.text
         return_key = self.generated_bots[update.effective_user.id].state_keys
         self.generated_bots[update.effective_user.id].entry_points = [
-            CommandHandler('start', CallablePrint(first_words, return_key))
+            CommandHandler('start', Start(first_words, return_key))
         ]
         # self.generated_bots[update.effective_user.id].state_keys += 1
-        update.message.reply_text('Please enter a command that the bot will respond to (will be shown as a button)')
+        update.message.reply_text('Please enter a conversation box using this notation:\n' + \
+                                  'Each conversation box will have main text and buttons \n' + \
+                                  '1)─────────────────────────┐\n' + \
+                                  '│ Main text:               │\n' + \
+                                  '│─────────────────────────│\n' + \
+                                  '│1.1)Button1 │ 1.2)Button2 │\n' + \
+                                  '└─────────────────────────┘\n' + \
+                                  'you can connect boxes with the add edge command and the folowing notation: 1.1->2\n' + \
+                                  'will connect box button 1.1 to box 2.\n' + \
+                                  'The Start will be automatically linked to box #1, or you can skip the staring box.')
+
         return ADD_COMMAND
 
     def ask_command(self, update: Update, context: CallbackContext):
@@ -223,18 +263,20 @@ class BotEngine:
         last_key = user_generated_bot.state_keys
         # last_command = products..
         # respose = iphone3.., ..,
-        user_generated_bot.states[last_key] = [MessageHandler(filters=Filters.text, callback=Button('',(last_key + 1),[last_command]))]  #button handler
-        user_generated_bot.state_keys += 1
-        last_key = user_generated_bot.state_keys
-        user_generated_bot.states[last_key] = [MessageHandler(filters=Filters.text, callback=Answer(response,last_key))] # answer handler
-        # keyboard_callback = CallbackQueryHandler(CallablePrint(response, last_key),
-        #                                          pattern='^' + str(user_generated_bot.button_key) + '$')
-        # if last_key not in user_generated_bot.states:
-        #     user_generated_bot.states[last_key] = []
-        # user_generated_bot.states[last_key].append(keyboard_callback)
-        # user_generated_bot.states[last_key][-1].callback.add_button(
-        #     [InlineKeyboardButton(text=last_command, callback_data=str(user_generated_bot.button_key))]
-        # )
+        # user_generated_bot.states[last_key] = [
+        #     MessageHandler(filters=Filters.text, callback=Button('', (last_key + 1), [last_command]))]  # button handler
+        # user_generated_bot.state_keys += 1
+        # last_key = user_generated_bot.state_keys
+        # user_generated_bot.states[last_key] = [
+        #     MessageHandler(filters=Filters.text, callback=Answer(response, last_key))]  # answer handler
+        keyboard_callback = CallbackQueryHandler(CallablePrint(response, last_key),
+                                                 pattern='^' + str(user_generated_bot.button_key) + '$')
+        if last_key not in user_generated_bot.states:
+            user_generated_bot.states[last_key] = []
+        user_generated_bot.states[last_key].append(keyboard_callback)
+        user_generated_bot.states[last_key][-1].callback.add_button(
+            [InlineKeyboardButton(text=last_command, callback_data=str(user_generated_bot.button_key))]
+        )
         # if self.follow_up == False:
         #     user_generated_bot.entry_points[0].callback.add_button(
         #         [InlineKeyboardButton(text=last_command, callback_data=str(user_generated_bot.button_key))]
@@ -246,7 +288,8 @@ class BotEngine:
         menu_buttons = [[InlineKeyboardButton(text='Add new command', callback_data=str(ASK_COMMAND))],
                         [InlineKeyboardButton(text='Add follow up question to this command',
                                               callback_data=str(ADD_FOLLOW_UP))],
-                        [InlineKeyboardButton(text='End building bot', callback_data=str(END))]
+                        [InlineKeyboardButton(text='Add edge between a button and a box', callback_data=str(END))],
+                        [InlineKeyboardButton(text='End building bot', callback_data=str(END))],
                         ]
         menu_keyboard = InlineKeyboardMarkup(menu_buttons)
         update.message.reply_text(text=menu_text, reply_markup=menu_keyboard)
@@ -267,7 +310,7 @@ class BotEngine:
                f"http://telegram.me/{user_generated_bot.bot_username}"
         menu_buttons = [[InlineKeyboardButton(text='Create a new Bot', callback_data=str(GET_API_KEY))]]
         menu_keyboard = InlineKeyboardMarkup(menu_buttons)
-        #self.make_back_to_menu_button(user_generated_bot)
+        # self.make_back_to_menu_button(user_generated_bot)
         query.message.reply_text(text=text, reply_markup=menu_keyboard)
         # for key, state in list(user_generated_bot.states.items()):
         #     for s in state:
@@ -284,7 +327,6 @@ class BotEngine:
         print(user_generated_bot.states)
         user_generated_bot.updater.start_polling()
         # user_generated_bot.updater.idle()
-
         # new_bot = threading.Thread(target=self.start_user_bot, args=(user_generated_bot,))
         # new_bot.start()
 
@@ -308,6 +350,31 @@ class BotEngine:
         query = update.callback_query
         query.answer()
         self.start(query, context)
+
+    def add_edge(self, update: Update, context: CallbackContext):
+        query = update.callback_query
+        text = 'Please enter the edge you would like to add: \n I.E: 1.2->2 (from box #1 button #2 will direct you ' \
+               'to box #2)'
+        update.message.reply_text(text=text)
+        return ADD_EDGE2
+
+    def add_edge2(self, update: Update, context: CallbackContext):
+        response = update.message.text  # response =  1.2->2
+        text = ''
+        try:
+            from_edge, to_edge = re.split('->', response)
+            user_generated_bot = self.generated_bots[update.effective_user.id]
+            from_edge = from_edge.split('.')
+            from_edge = [int(i) for i in from_edge]
+            to_edge = int(to_edge)
+            user_generated_bot.add_edge(from_edge, to_edge)
+            text = 'Edge added successfully!'
+        except ValueError:
+            text = 'too much parameters were given, please try again'
+        except:
+            text = 'Wrong parameters were given, please try again'
+        update.message.reply_text(text=text)
+        return SELECTION
 
     # def make_back_to_menu_button(self, user_generated_bot):
     #     button_key = user_generated_bot.button_key
@@ -334,6 +401,57 @@ class BotEngine:
         self.follow_up = True
         return ADD_COMMAND
 
+    def add_box(self, update: Update, context: CallbackContext):
+        text = 'Please the box msg/action'
+        update.message.reply_text(text=text)
+        return ADD_BOX2
+
+    def add_box2(self, update: Update, context: CallbackContext):
+        text = ''
+        box_msg = update.message.text
+        user_generated_bot = self.generated_bots[update.effective_user.id]
+        try:
+            box_number = user_generated_bot.add_box(box_msg)
+            text = f'The box you created has the number of {box_number}'
+        except:
+            text = 'Invalid box number was given. please try again'
+        update.message.reply_text(text=text)
+        return SELECTION
+
+    def add_box_button(self, update: Update, context: CallbackContext):
+        text = 'Please enter the number of box'
+        update.message.reply_text(text=text)
+        return ADD_BOX2
+
+    def add_box_button2(self, update: Update, context: CallbackContext):
+        text = ''
+        box_number = update.message.text
+        try:
+            box_number = int(box_number)
+            user_generated_bot = self.generated_bots[update.effective_user.id]
+            if box_number in user_generated_bot.states:
+                text = 'Number box given is in use, please give another number or delete the number box given.'
+            else:
+                text = 'Please enter the text that will be shown on the button'
+                user_generated_bot.build_button['box'] = box_number
+        except:
+            text = 'Invalid box number was given. please try again'
+            self.add_box(update, context)
+            return ADD_BOX
+        update.message.reply_text(text=text)
+        return ADD_BOX3
+
+    def add_box_button3(self, update: Update, context: CallbackContext):  # text on button
+        text = ''
+        user_generated_bot = self.generated_bots[update.effective_user.id]
+        box_number = user_generated_bot.build_button['box']
+        button_text = update.message.text
+        user_generated_bot.add_box_button(box_number, button_text)
+        #user_generated_bot.add_button_box
+
+
+        # must know edges to build a button
+
 
 ADD_START = 1
 ADD_QUESTION = 2
@@ -347,6 +465,11 @@ ASK_COMMAND = 9
 SELECTION = 10
 START_AGAIN = 11
 ADD_FOLLOW_UP = 12
+ADD_EDGE = 13
+ADD_EDGE2 = 14
+ADD_BOX = 15
+ADD_BOX2 = 16
+ADD_BOX3 = 17
 
 
 def main():
@@ -360,9 +483,15 @@ def main():
             ADD_START: [MessageHandler(Filters.text, mainbot.define_bot_start)],
             SELECTION: [
                 CallbackQueryHandler(mainbot.ask_command, pattern='^' + str(ASK_COMMAND) + '$'),
+                CallbackQueryHandler(mainbot.add_box, pattern='^' + str(ASK_COMMAND) + '$', pass_user_data=True),
+                # todo
+                CallbackQueryHandler(mainbot.add_box_button, pattern='^' + str(ASK_COMMAND) + '$', pass_user_data=True),
+                # todo
                 CallbackQueryHandler(mainbot.add_follow_up, pattern='^' + str(ADD_FOLLOW_UP) + '$'),
-                CallbackQueryHandler(mainbot.end_build_bot, pattern='^' + str(END) + '$')
+                CallbackQueryHandler(mainbot.add_edge, pattern='^' + str(ADD_EDGE) + '$'),
+                CallbackQueryHandler(mainbot.end_build_bot, pattern='^' + str(END) + '$'),
             ],
+            ADD_EDGE2: [MessageHandler(Filters.text, mainbot.add_edge2)],
             ADD_COMMAND: [MessageHandler(Filters.text, mainbot.add_command)],
             ADD_RESPONSE: [MessageHandler(Filters.text, mainbot.add_response)],
             START_AGAIN: [CallbackQueryHandler(mainbot.start_over, pattern='^' + str(START_AGAIN) + '$')],

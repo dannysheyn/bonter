@@ -84,16 +84,16 @@ def one(update: Update, _: CallbackContext) -> int:
     query = update.callback_query
     query.answer()
     keyboard = [
-        [
-            InlineKeyboardButton("3", callback_data=str(THREE)),
-            InlineKeyboardButton("4", callback_data=str(FOUR)),
+        [ #1.1->2 , 2.2->3
+            InlineKeyboardButton("3", callback_data=str(THREE)), #-> 1
+            InlineKeyboardButton("4", callback_data=str(FOUR)), #-> 2
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     query.edit_message_text(
         text="First CallbackQueryHandler, Choose a route", reply_markup=reply_markup
     )
-    return FIRST
+    return FIRST # return next_state()
 
 
 def two(update: Update, _: CallbackContext) -> int:
@@ -101,9 +101,10 @@ def two(update: Update, _: CallbackContext) -> int:
     query = update.callback_query
     query.answer()
     keyboard = [
-        [
+        [#2.2 -> 3
+            #  buttm.callback_data = 3 #new box
             InlineKeyboardButton("1", callback_data=str(ONE)),
-            InlineKeyboardButton("3", callback_data=str(THREE)),
+            InlineKeyboardButton("2", callback_data=str(THREE)),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -173,7 +174,7 @@ def main() -> None:
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
-            FIRST: [
+            FIRST: [ #1.1->2.2->3.1
                 CallbackQueryHandler(one, pattern='^' + str(ONE) + '$'),
                 CallbackQueryHandler(two, pattern='^' + str(TWO) + '$'),
                 CallbackQueryHandler(three, pattern='^' + str(THREE) + '$'),

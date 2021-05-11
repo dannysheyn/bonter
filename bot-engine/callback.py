@@ -2,7 +2,7 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import CallbackContext
 
 
-class Button:
+class Callback:
     def __init__(self, msg, next_state, replay_button=None):
         self.msg = msg
         self.next_state = next_state
@@ -25,6 +25,15 @@ class Button:
         else:
             return update
 
+
+class Start(Callback):
+    def __call__(self, update: Update, context: CallbackContext):
+        text = self.msg
+        keyboard = ReplyKeyboardMarkup([['Press here to start the bot']])
+        update.message.reply_text(text=text, reply_markup=keyboard)
+        return self.next_state
+
+class Button(Callback):
     def __call__(self, update: Update, context: CallbackContext):
         update = self.check_query(update, context)
         if self.replay_buttons:
@@ -33,6 +42,7 @@ class Button:
             text = "Pick one of the following:"
             update.message.reply_text(text=text, reply_markup=keyboard)
         return self.next_state
+
 
 class Answer:
     def __init__(self, msg, next_state, replay_buttons=None):
