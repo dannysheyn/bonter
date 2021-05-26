@@ -11,6 +11,8 @@ from telegram.ext import (
 import requests
 from callback import *
 import re
+from showBot import *
+import showBot
 import threading
 import os
 
@@ -121,7 +123,10 @@ class UserGeneratedBot:
         self.button_key = 0
         self.build_button = {}
         self.edges = set()
+        self.nodes = {}
         self.pattern = 0
+        self.bot_pic = botToPicture()
+        self.user_variables = {}
 
     def add_button_command(self, state_key, callback, button_text, returned_button_key):
         callback.add_button([InlineKeyboardButton(button_text, callback_data=str(self.button_key))])
@@ -136,6 +141,11 @@ class UserGeneratedBot:
         # self.edges.add((1, 2, 2))
         box = fromBox[0] - 1
         from_button = fromBox[1] - 1
+        new_edge = bot_edge(box, from_button, destinationBox - 1)
+        if new_edge not in self.edges:
+            self.edges.add(new_edge)
+        else:
+            raise Exception('Cannot add the same edge twice')
         box_callback = self.states[self.state_key][box].callback
         box_buttons = box_callback.reply_buttons
         inlinekeyBoard = box_buttons[from_button]
@@ -148,12 +158,15 @@ class UserGeneratedBot:
             CallbackQueryHandler(CallablePrint(msg=box_msg),
                                  pattern='^' + str(self.pattern) + '$')
         )
+        self.nodes[self.pattern] = bot_node(self.pattern, box_msg)
         self.pattern += 1
         return self.pattern
 
     def add_box_button(self, box_number, button_text):
         callbackqueryArray = self.states[self.state_key]
         box_number -= 1
+        node = self.nodes[box_number]
+        node.button_list.append(button_text)
         callbackqueryArray[box_number].callback.add_button(
             InlineKeyboardButton(button_text)
         )
@@ -176,6 +189,9 @@ class UserGeneratedBot:
             if callback.pattern.pattern == pattern:
                 return True
         return False
+
+    def show_bot(self, file_name):
+        return self.bot_pic.render_graph(self.nodes.values(), self.edges, file_name)
 
 
 class BotEngine:
@@ -221,7 +237,7 @@ class BotEngine:
             update.message.reply_text('You have entered a wrong api key, please enter a valid one.')
             return GET_API_KEY
 
-    def main_menu(self, update: Update, context: CallbackContext):
+    def main_menu(self, update, context: CallbackContext):
         text = 'Please choose one of the following actions'
         keyboard = \
             [
@@ -382,6 +398,15 @@ class BotEngine:
         update.message.reply_text(text=text)
         return self.main_menu(update, context)
 
+    def print_bot(self, update: Update, context: CallbackContext):
+        query = update.callback_query
+        query.answer()
+        user_generated_bot = self.generated_bots[update.effective_user.id]
+        file_path = user_generated_bot.show_bot(str(update.effective_user.id))
+        print(file_path)
+        query.message.reply_photo(photo=open(file_path, 'rb'), caption='Here is your bot!')
+        return self.main_menu(query, context)
+
 
 ADD_START = 1
 ADD_QUESTION = 2
@@ -418,19 +443,17 @@ def main():
             GET_API_KEY: [MessageHandler(Filters.text, mainbot.get_api_key)],
             ADD_START: [MessageHandler(Filters.text, mainbot.define_bot_start)],
             SELECTION: [
-                # CallbackQueryHandler(mainbot.ask_command, pattern='^' + str(ASK_COMMAND) + '$'),
                 CallbackQueryHandler(mainbot.add_box, pattern='^' + str(ADD_BOX) + '$'),
                 CallbackQueryHandler(mainbot.add_box_button, pattern='^' + str(ADD_BOX_BUTTON) + '$'),
                 CallbackQueryHandler(mainbot.add_follow_up, pattern='^' + str(ADD_FOLLOW_UP) + '$'),
                 CallbackQueryHandler(mainbot.add_edge, pattern='^' + str(ADD_EDGE) + '$'),
+                CallbackQueryHandler(mainbot.print_bot, pattern='^' + str(PRINT_BOT) + '$'),
                 CallbackQueryHandler(mainbot.end_build_bot, pattern='^' + str(END) + '$'),
             ],
             ADD_BOX2: [MessageHandler(Filters.text, mainbot.add_box2)],
             ADD_EDGE2: [MessageHandler(Filters.text, mainbot.add_edge2)],
             ADD_BOX_BUTTON2: [MessageHandler(Filters.text, mainbot.add_box_button2)],
             ADD_BOX_BUTTON3: [MessageHandler(Filters.text, mainbot.add_box_button3)],
-            # ADD_COMMAND: [MessageHandler(Filters.text, mainbot.add_command)],
-            # ADD_RESPONSE: [MessageHandler(Filters.text, mainbot.add_response)],
         },
         fallbacks=[CommandHandler('cancel', mainbot.start)],
     )

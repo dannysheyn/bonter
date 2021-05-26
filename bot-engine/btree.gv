@@ -1,0 +1,14 @@
+digraph g {
+	node [shape=record]
+	box0 [label="{<f0> Box 1|{<f1>1.1|<f2>1.2}}"]
+	box1 [label="{<f0> Box 2|{<f1>2.1|<f2>2.2|<f3>2.3}}"]
+	box2 [label="{<f0> Box 3|{<f1>3.1}}"]
+	box3 [label="{<f0> Box 4}"]
+	box4 [label="{<f0> Box 5|{<f1>5.1|<f2>5.2|<f3>5.3}}"]
+	box0:f1 -> box1:f0
+	box0:f2 -> box2:f0
+	box1:f1 -> box2:f0
+	box1:f2 -> box3:f0
+	box1:f3 -> box4:f0
+	box4:f1 -> box0:f0
+}
