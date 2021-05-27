@@ -73,3 +73,16 @@
 #     user_generated_bot.dispatcher.add_handler(user_generated_bot.conv_handler)
 #     user_generated_bot.updater.start_polling()
 #     user_generated_bot.updater.idle()
+#
+#     def add_follow_up(self, update: Update, context: CallbackContext):
+#         query = update.callback_query
+#         query.answer()
+#         user_generated_bot = self.generated_bots[update.effective_user.id]
+#         last_key = user_generated_bot.state_keys
+#         user_generated_bot.state_keys += 1
+#         user_generated_bot.states[last_key][-1].callback.next_state = user_generated_bot.state_keys
+#         query.message.reply_text(
+#             'Please enter a command that the bot will respond to (will be shown as a button)\n (this is a nested '
+#             'command)')
+#         self.follow_up = True
+#         return ADD_COMMAND

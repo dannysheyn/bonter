@@ -1,7 +1,6 @@
 from graphviz import Digraph, nohtml
 
 
-
 class bot_edge:
     def __init__(self, box, button, destination):
         self.box = box
@@ -16,7 +15,7 @@ class bot_node:
     def __init__(self, box, msg=''):
         self.box = box
         self.msg = msg
-        self.button_list = []  # [i for i in range(1, num_of_buttons + 1, 1)]
+        self.button_list = []
 
 
 class botToPicture:

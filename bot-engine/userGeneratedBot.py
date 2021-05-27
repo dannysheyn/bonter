@@ -1,0 +1,100 @@
+from telegram import InlineKeyboardButton
+from telegram.ext import CallbackQueryHandler, CommandHandler
+
+from callableBox import CallableAPI, CallablePrint
+from showBot import botToPicture, bot_edge, bot_node
+
+
+class UserGeneratedBot:
+    box_type_api = 'api'
+    box_type_text = 'text'
+
+    def __init__(self, bot_username=None, bot_api_key=None, conv_handler=None):
+        self.bot_username = bot_username
+        self.bot_api_key = bot_api_key
+        self.conv_handler = conv_handler
+        self.updater = None  # Updater(bot_api_key, use_context=True)
+        self.dispatcher = None
+        self.entry_points = []  # build on the go /start /hi
+        self.states = {}  # build on the go
+        self.fallbacks = []  # build on the go
+        self.state_key = 1
+        self.commands = []
+        self.button_key = 0
+        self.build_button = {}
+        self.edges = set()
+        self.nodes = {}
+        self.pattern = 0
+        self.bot_pic = botToPicture()
+        self.user_variables = {}
+        self.apis = []
+
+    def add_button_command(self, state_key, callback, button_text, returned_button_key):
+        callback.add_button([InlineKeyboardButton(button_text, callback_data=str(self.button_key))])
+        self.states[state_key].append(
+            CallbackQueryHandler(callback, pattern='^' + str(self.button_key) + '$')
+        )
+
+        # fromBox = (1 ,2 ) => from box 1 button 2 (1.2) to destBox
+        # (1,2), 2  1.2->2
+
+    def add_edge(self, fromBox: tuple, destinationBox):
+        # self.edges.add((1, 2, 2))
+        box = fromBox[0] - 1
+        from_button = fromBox[1] - 1
+        new_edge = bot_edge(box, from_button, destinationBox - 1)
+        if new_edge not in self.edges:
+            self.edges.add(new_edge)
+        else:
+            raise Exception('Cannot add the same edge twice')
+        box_callback = self.states[self.state_key][box].callback
+        box_buttons = box_callback.reply_buttons
+        inlinekeyBoard = box_buttons[from_button]
+        inlinekeyBoard.callback_data = str(destinationBox - 1)
+
+    def add_box(self, box_msg, box_type, api_obj):
+        if self.state_key not in self.states:
+            self.states[self.state_key] = []
+        if self.box_type_api == box_type:
+            self.states[self.state_key].append(
+                CallbackQueryHandler(CallableAPI(msg=box_msg, api=api_obj),
+                                     pattern='^' + str(self.pattern) + '$'))
+        if self.box_type_text == box_type:
+            self.states[self.state_key].append(
+                CallbackQueryHandler(CallablePrint(msg=box_msg),
+                                     pattern='^' + str(self.pattern) + '$')
+            )
+        self.nodes[self.pattern] = bot_node(self.pattern, box_msg)
+        self.pattern += 1
+        return self.pattern
+
+    def add_box_button(self, box_number, button_text):
+        callbackqueryArray = self.states[self.state_key]
+        box_number -= 1
+        node = self.nodes[box_number]
+        node.button_list.append(button_text)
+        callbackqueryArray[box_number].callback.add_button(
+            InlineKeyboardButton(button_text)
+        )
+        return len(callbackqueryArray[box_number].callback.reply_buttons)
+
+    def add_starting_point(self, msg):
+        callback = CallablePrint(msg=msg)
+        callback.add_button(
+            InlineKeyboardButton("Start you bot here!", callback_data=str(0))
+        )
+        self.entry_points.append(
+            CommandHandler('start', callback)
+        )
+
+    def is_valid_box(self, box_number):
+        box_number -= 1
+        callbackqueryArray = self.states[self.state_key]
+        pattern = '^' + str(box_number) + '$'
+        for callback in callbackqueryArray:
+            if callback.pattern.pattern == pattern:
+                return True
+        return False
+
+    def show_bot(self, file_name):
+        return self.bot_pic.render_graph(self.nodes.values(), self.edges, file_name)

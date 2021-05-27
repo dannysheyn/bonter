@@ -1,3 +1,5 @@
+import json
+
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Updater,
@@ -9,13 +11,14 @@ from telegram.ext import (
     Handler, CallbackQueryHandler,
 )
 import requests
+
+from api import API
 from callback import *
 import re
 from showBot import *
 import showBot
 import threading
 import os
-
 
 # TODO: Flights, RSS,Group chats + bots,Group Notification, Basic Api integrations with calender, gmail and more., Polls, Order bot? ,data to Graps , predefined demos
 # TODO: 1) fix the code.
@@ -24,6 +27,7 @@ import os
 #  and looking into how to upgrade the fetures in the bot engine ( at least add command to a command) i.e nested commands.
 # TODO: maybe api action?
 # TODO: defult end bot,
+# 0) intigrate the new api feature into the bot-engine
 # 1) API , visualisation
 # 2) aswer with .. (text,image, voice?)
 # 3) impove chat flow, UI UX...
@@ -45,153 +49,7 @@ import os
 # Plan: mannage one state with multipyl callbackquery handlers
 #
 #
-
-class CallablePrint:
-    def __init__(self, msg, next_state=1):
-        self.msg = msg
-        self.next_state = next_state
-        self.reply_buttons = []
-
-    def add_button(self, button):
-        self.reply_buttons.append(button)
-
-    def check_query(self, update: Update, context: CallbackContext):
-        query = update.callback_query
-        if query is not None:
-            query.answer()
-            return query
-        else:
-            return update
-
-    def __call__(self, update: Update, context: CallbackContext):
-        update = self.check_query(update, context)
-        update.message.reply_text(text=self.msg)
-        if self.reply_buttons:
-            print(self.reply_buttons)
-            keyboard = InlineKeyboardMarkup([self.reply_buttons])
-            update.message.reply_text(text=self.msg, reply_markup=keyboard)
-        return self.next_state
-
-
-class CallableAPI:
-    def __init__(self, uri, next_state):
-        self.uri = uri
-        self.next_state = next_state
-        self.replay_buttons = []
-        self.json_value = None
-
-    def add_button(self, button):
-        self.replay_buttons.append(button)
-
-    def check_query(self, update: Update, context: CallbackContext):
-        query = update.callback_query
-        if query is not None:
-            query.answer()
-            return query
-        else:
-            return update
-
-    def __call__(self, update: Update, context: CallbackContext):
-        update = self.check_query(update, context)
-        response = requests.get(self.uri)
-        update.message.reply_text(text=self.msg)
-        if self.replay_buttons:
-            print(self.replay_buttons)
-            keyboard = InlineKeyboardMarkup(self.replay_buttons)
-            text = "What would you like to do next"
-            update.message.reply_text(text=text, reply_markup=keyboard)
-        return self.next_state
-
-
-# class CallableAPI(CallablePrint):
-#     def __init__(self, api_url, key, msg, next_state):
-#         super(CallableAPI, self).__init__()
-
-
-class UserGeneratedBot:
-    def __init__(self, bot_username=None, bot_api_key=None, conv_handler=None):
-        self.bot_username = bot_username
-        self.bot_api_key = bot_api_key
-        self.conv_handler = conv_handler
-        self.updater = None  # Updater(bot_api_key, use_context=True)
-        self.dispatcher = None
-        self.entry_points = []  # build on the go /start /hi
-        self.states = {}  # build on the go
-        self.fallbacks = []  # build on the go
-        self.state_key = 1
-        self.commands = []
-        self.button_key = 0
-        self.build_button = {}
-        self.edges = set()
-        self.nodes = {}
-        self.pattern = 0
-        self.bot_pic = botToPicture()
-        self.user_variables = {}
-
-    def add_button_command(self, state_key, callback, button_text, returned_button_key):
-        callback.add_button([InlineKeyboardButton(button_text, callback_data=str(self.button_key))])
-        self.states[state_key].append(
-            CallbackQueryHandler(callback, pattern='^' + str(self.button_key) + '$')
-        )
-
-        # fromBox = (1 ,2 ) => from box 1 button 2 (1.2) to destBox
-        # (1,2), 2  1.2->2
-
-    def add_edge(self, fromBox: tuple, destinationBox):
-        # self.edges.add((1, 2, 2))
-        box = fromBox[0] - 1
-        from_button = fromBox[1] - 1
-        new_edge = bot_edge(box, from_button, destinationBox - 1)
-        if new_edge not in self.edges:
-            self.edges.add(new_edge)
-        else:
-            raise Exception('Cannot add the same edge twice')
-        box_callback = self.states[self.state_key][box].callback
-        box_buttons = box_callback.reply_buttons
-        inlinekeyBoard = box_buttons[from_button]
-        inlinekeyBoard.callback_data = str(destinationBox - 1)
-
-    def add_box(self, box_msg):
-        if self.state_key not in self.states:
-            self.states[self.state_key] = []
-        self.states[self.state_key].append(
-            CallbackQueryHandler(CallablePrint(msg=box_msg),
-                                 pattern='^' + str(self.pattern) + '$')
-        )
-        self.nodes[self.pattern] = bot_node(self.pattern, box_msg)
-        self.pattern += 1
-        return self.pattern
-
-    def add_box_button(self, box_number, button_text):
-        callbackqueryArray = self.states[self.state_key]
-        box_number -= 1
-        node = self.nodes[box_number]
-        node.button_list.append(button_text)
-        callbackqueryArray[box_number].callback.add_button(
-            InlineKeyboardButton(button_text)
-        )
-        return len(callbackqueryArray[box_number].callback.reply_buttons)
-
-    def add_starting_point(self, msg):
-        callback = CallablePrint(msg=msg)
-        callback.add_button(
-            InlineKeyboardButton("Start you bot here!", callback_data=str(0))
-        )
-        self.entry_points.append(
-            CommandHandler('start', callback)
-        )
-
-    def is_valid_box(self, box_number):
-        box_number -= 1
-        callbackqueryArray = self.states[self.state_key]
-        pattern = '^' + str(box_number) + '$'
-        for callback in callbackqueryArray:
-            if callback.pattern.pattern == pattern:
-                return True
-        return False
-
-    def show_bot(self, file_name):
-        return self.bot_pic.render_graph(self.nodes.values(), self.edges, file_name)
+from userGeneratedBot import UserGeneratedBot
 
 
 class BotEngine:
@@ -242,7 +100,7 @@ class BotEngine:
         keyboard = \
             [
 
-                [InlineKeyboardButton("Add box", callback_data=str(ADD_BOX))],
+                [InlineKeyboardButton("Add box", callback_data=str(CHOOSE_BOX))],
                 [InlineKeyboardButton("Add edge", callback_data=str(ADD_EDGE))],
                 [InlineKeyboardButton("Add box button", callback_data=str(ADD_BOX_BUTTON))],
                 [InlineKeyboardButton("Print bot", callback_data=str(PRINT_BOT))],
@@ -331,32 +189,34 @@ class BotEngine:
         update.message.reply_text(text=text)
         return self.main_menu(update, context)
 
-    def add_follow_up(self, update: Update, context: CallbackContext):
+    def choose_box(self, update: Update, context: CallbackContext):
         query = update.callback_query
         query.answer()
-        user_generated_bot = self.generated_bots[update.effective_user.id]
-        last_key = user_generated_bot.state_keys
-        user_generated_bot.state_keys += 1
-        user_generated_bot.states[last_key][-1].callback.next_state = user_generated_bot.state_keys
-        query.message.reply_text(
-            'Please enter a command that the bot will respond to (will be shown as a button)\n (this is a nested '
-            'command)')
-        self.follow_up = True
-        return ADD_COMMAND
+        text = 'Please Choose one of the following box purpose \n' \
+               'Text box: Choose the text you want show to the user.\n' \
+               'Api box: Choose an API you want show to the user.\n'
+        keyboard = \
+            [
+                [InlineKeyboardButton("Add text box", callback_data=str(ADD_TEXT_BOX))],
+                [InlineKeyboardButton("Add API fetch box", callback_data=str(ADD_API_BOX))],
+            ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        query.message.edit_text(text=text, reply_markup=reply_markup)
+        return BOX_DECISION
 
-    def add_box(self, update: Update, context: CallbackContext):
+    def add_text_box(self, update: Update, context: CallbackContext):
         query = update.callback_query
         query.answer()
         text = 'Please enter the box msg'
         query.message.reply_text(text=text)
-        return ADD_BOX2
+        return ADD_TEXT_BOX2
 
-    def add_box2(self, update: Update, context: CallbackContext):
+    def add_text_box2(self, update: Update, context: CallbackContext):
         text = ''
         box_msg = update.message.text
         user_generated_bot = self.generated_bots[update.effective_user.id]
         try:
-            box_number = user_generated_bot.add_box(box_msg)
+            box_number = user_generated_bot.add_text_box(box_msg)
             text = f'The box you created has the number of {box_number}'
         except:
             text = 'Invalid box number was given. please try again'
@@ -407,30 +267,164 @@ class BotEngine:
         query.message.reply_photo(photo=open(file_path, 'rb'), caption='Here is your bot!')
         return self.main_menu(query, context)
 
+    def start_api_flow(self, update: Update, context: CallbackContext):
+        query = update.callback_query
+        query.answer()
+        text = "We will now ask you some basic questions regarding" \
+               "your API endpoint\n\n" \
+               "What is the base endpoint of the API you want to integrate"
+        query.message.reply_text(text=text)
+        return GET_BASE_API
+
+    def get_base_api(self, update: Update, context: CallbackContext):
+        base_url = update.message.text
+        user_generated_bot = self.generated_bots[update.effective_user.id]
+        user_generated_bot.apis.append(API())
+        user_generated_bot.apis[-1].uri = base_url
+        request = user_generated_bot.apis[-1].get_api_response()
+        if request.status_code == 200:
+            text = "Nice!\n" \
+                   "Now we need to get the query parameters that this endpoint expects to get\n" \
+                   "Please write key value pairs separated by comma (For example: destination:israel, origin:Germany)\n" \
+                   "The request will be made according to the values the end user will input\n" \
+                   "If there are no query parameters type None"
+            # Should we infer the button text from the endpoint or ask the user
+            # For not lets infer the first endpoint
+            update.message.reply_text(text=text)
+            return GET_QUERY_PARAMS
+
+        else:
+            text = f"We got a {request.status_code} response code from this uri" \
+                   "Please make sure you passed the right uri and try again\n"
+            update.message.reply_text(text=text)
+            return self.get_base_api(update, context)
+
+    # def get_endpoint(self, update: Update, context: CallbackContext):
+    #     endpoint = update.message.text
+    #     if not endpoint.startswith('/'):
+    #         endpoint = '/' + endpoint
+    #     user_generated_bot = self.generated_bots[update.effective_user.id]
+    #     if user_generated_bot.apis[-1].uri.endswith('/'):
+    #         user_generated_bot.apis[-1].uri += endpoint.lstrip('/')
+    #     else:
+    #         user_generated_bot.apis[-1].uri += endpoint
+    #
+    #
+    #     update.message.reply_text(text=text)
+    #     return GET_QUERY_PARAMS
+
+    def trim_long_response(self, response):
+        start = f'{response[0:100]}'
+        mid = '.\n.\n.\n.\n.\n.\n.\n'
+        end = f'{response[-100:-1]}'
+        return f'{start}{mid}{end}'
+
+    def get_query_params(self, update: Update, context: CallbackContext):
+        # First validate that it matches the desired pattern
+        # key:value, key:value ...
+        query_params = [key_value.strip() for key_value in update.message.text.split('&')]
+        user_generated_bot = self.generated_bots[update.effective_user.id]
+        for query_param in query_params:
+            key, value = query_param.split("=", 1)
+            user_generated_bot.apis[-1].query_params[key] = value
+
+        request = user_generated_bot.apis[-1].get_api_response()
+        # Validate it's a Json response, currently we will support only Json
+        if request.status_code == 200:
+            pretty_response = json.loads(request.text)
+            user_generated_bot.apis[-1].response = pretty_response
+            pretty_response = json.dumps(pretty_response, indent=2)
+            if len(pretty_response) > 4000:
+                pretty_response = self.trim_long_response(json.dumps(pretty_response, indent=2))
+            text = "We just made a request with the parameters that you provided" \
+                   "and got the following response\n\n" \
+                   f"{pretty_response}"
+            text_get_key = "What keys would you like to show the user from this response?\n" \
+                           "Write Json expressions which evaluate to your keys separated by commas, for example: [origin], " \
+                           "[destination][flight_num], etc..." \
+                           "If the key is inside an array you need to index it, for example: [0][origin], " \
+                           "[destination][1]\n" \
+                           "You can use nesting for dictionaries as well, for example: [data][name], [0][data][time]\n" \
+                           "You can also type in expressions which are arrays and we will get all the keys there" \
+                           "If you want all the response to be displayed type ALL"
+
+            # In general expression maps to the value of the key
+            update.message.reply_text(text=text)
+            update.message.reply_text(text=text_get_key)
+            return GET_KEY_FROM_RESPONSE
+        else:
+            text = f"We got a {request.status_code} response code from this uri with those parameters" \
+                   "Please make sure you passed the right parameters and try again\n"
+            update.message.reply_text(text=text)
+            return self.get_query_params(update, context)
+
+    def get_keys_to_retrieve(self, update: Update, context: CallbackContext):
+        expressions = [expression.strip() for expression in update.message.text.split(',')]
+        user_generated_bot = self.generated_bots[update.effective_user.id]
+        user_generated_bot.apis[-1].expressions = expressions
+
+        try:
+            user_generated_bot.apis[-1].validate_keys()
+        except Exception as e:
+            error_message = "We couldn't validate one of your expressions\n" \
+                            f"Original error is: {e}\n" \
+                            f"Please try to write those expressions again according to the rules"
+            update.message.reply_text(text=error_message)
+            return self.get_keys_to_retrieve(update, context)
+
+        key_expression_mapping = user_generated_bot.apis[-1].key_expression_map()
+        ref_keys_text = "Your keys have been validated and we have saved them\n" \
+                        "Here is the key-expression mapping (In this format {Key} = {Expression}):\n" \
+                        f"{key_expression_mapping}"
+        next_stage_text = "How would you like to present the data to the user?\n" \
+                          "notice that you can reference a key like this ${key}, " \
+                          "And we will get the value out of the expression that matches the key at run time\n" \
+                          "For example: Your flight leaves at ${time} from ${destination} to ${origin}"
+
+        update.message.reply_text(text=ref_keys_text)
+        update.message.reply_text(text=next_stage_text)
+        return GET_MESSAGE_TO_USER
+
+    def get_message_to_user(self, update: Update, context: CallbackContext):
+        user_generated_bot = self.generated_bots[update.effective_user.id]
+        # TODO: Validate that this is a valid message
+        user_generated_bot.apis[-1].message_to_user = update.message.text
+        user_generated_bot.add_box(box_msg=None, box_type='api', api_obj=user_generated_bot.apis[-1])
+        # if not valid message recursively come back to this function
+        # else we finish the process and create new callbackquery handler
+        text = "The API Endpoint was created successfully"
+        update.message.reply_text(text=text)
+        return self.main_menu(update, context)
+
+    def get_authorization_header(self, update: Update, context: CallbackContext):
+        pass
+
 
 ADD_START = 1
 ADD_QUESTION = 2
 GET_API_KEY = 3
-INVALID_STATE = 4
-ADD_COMMAND = 5
-ADD_RESPONSE = 6
-MENU = 7
 END = 8
-ASK_COMMAND = 9
 SELECTION = 10
 START_AGAIN = 11
-ADD_FOLLOW_UP = 12
 ADD_EDGE = 13
 ADD_EDGE2 = 14
-ADD_BOX = 15
-ADD_BOX2 = 16
-ADD_BOX3 = 17
+ADD_TEXT_BOX = 15
+ADD_TEXT_BOX2 = 16
 ADD_BOX_BUTTON = 18
 PRINT_BOT = 19
 HELP = 20
 MAIN_MENU = 21
 ADD_BOX_BUTTON2 = 22
 ADD_BOX_BUTTON3 = 23
+GET_KEY_FROM_RESPONSE = 24
+GET_MESSAGE_TO_USER = 25
+GET_QUERY_PARAMS = 26
+GET_ENDPOINT = 27
+GET_BASE_API = 28
+START_API_FLOW = 29
+CHOOSE_BOX = 30
+BOX_DECISION = 31
+ADD_API_BOX = 32
 
 
 def main():
@@ -443,14 +437,22 @@ def main():
             GET_API_KEY: [MessageHandler(Filters.text, mainbot.get_api_key)],
             ADD_START: [MessageHandler(Filters.text, mainbot.define_bot_start)],
             SELECTION: [
-                CallbackQueryHandler(mainbot.add_box, pattern='^' + str(ADD_BOX) + '$'),
+                CallbackQueryHandler(mainbot.choose_box, pattern='^' + str(CHOOSE_BOX) + '$'),
                 CallbackQueryHandler(mainbot.add_box_button, pattern='^' + str(ADD_BOX_BUTTON) + '$'),
-                CallbackQueryHandler(mainbot.add_follow_up, pattern='^' + str(ADD_FOLLOW_UP) + '$'),
                 CallbackQueryHandler(mainbot.add_edge, pattern='^' + str(ADD_EDGE) + '$'),
                 CallbackQueryHandler(mainbot.print_bot, pattern='^' + str(PRINT_BOT) + '$'),
                 CallbackQueryHandler(mainbot.end_build_bot, pattern='^' + str(END) + '$'),
             ],
-            ADD_BOX2: [MessageHandler(Filters.text, mainbot.add_box2)],
+            BOX_DECISION: [
+                CallbackQueryHandler(mainbot.add_text_box, pattern='^' + str(ADD_TEXT_BOX) + '$'),
+                CallbackQueryHandler(mainbot.start_api_flow, pattern='^' + str(ADD_API_BOX) + '$'),
+            ],
+            GET_BASE_API: [MessageHandler(Filters.text, mainbot.get_base_api)],
+            # GET_ENDPOINT: [MessageHandler(Filters.text, mainbot.get_endpoint)],
+            GET_QUERY_PARAMS: [MessageHandler(Filters.text, mainbot.get_query_params)],
+            GET_KEY_FROM_RESPONSE: [MessageHandler(Filters.text, mainbot.get_keys_to_retrieve)],
+            GET_MESSAGE_TO_USER: [MessageHandler(Filters.text, mainbot.get_message_to_user)],
+            ADD_TEXT_BOX2: [MessageHandler(Filters.text, mainbot.add_text_box2)],
             ADD_EDGE2: [MessageHandler(Filters.text, mainbot.add_edge2)],
             ADD_BOX_BUTTON2: [MessageHandler(Filters.text, mainbot.add_box_button2)],
             ADD_BOX_BUTTON3: [MessageHandler(Filters.text, mainbot.add_box_button3)],
