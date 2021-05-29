@@ -43,16 +43,19 @@ class API:
             for element in elements:
                 if not element.isnumeric() and element not in response:
                     if prev_key is not None:
-                        raise KeyError(f"In the expression {expression}\n the key {element} does not exist in the "
+                        raise KeyError(f"In the expression {expression} the key {element} does not exist in the "
                                        f"context of '{prev_key}'")
                     else:
-                        raise KeyError(f"In the expression {expression}\n the key {element} does not exist in this "
+                        raise KeyError(f"In the expression {expression} the key {element} does not exist in this "
                                        f"context")
 
-                if element.isnumeric() and isinstance(response, list):
+                if element.isnumeric():
                     element = int(element)
-                    if not (0 <= int(element) < len(response)):
-                        raise IndexError(f"In the expression {expression}\n the index {element} does not exist in the list")
+                    if isinstance(response, list) and not (0 <= int(element) < len(response)):
+                        raise IndexError(f"In the expression {expression} the index {element} does not exist in the list")
+                    if isinstance(response, dict) :
+                        raise KeyError(f"In the expression {expression} The key {element} is not a valid key in "
+                                       f"this dictionary context")
                 response = response[element]
                 prev_key = element
 
@@ -72,4 +75,4 @@ class API:
         variables = re.findall(r"\$\{([A-Za-z0-9_]+)\}", self.message_to_user)
         for variable in variables:
             replacement = self.key_expression[variable][1]
-            re.sub(r"\$\{([A-Za-z0-9_]+)\}", replacement, self.message_to_user, 1)
+            self.message_to_user = re.sub(r"\$\{([A-Za-z0-9_]+)\}", replacement, self.message_to_user, 1)

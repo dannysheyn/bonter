@@ -1,0 +1,4 @@
+digraph g {
+	node [shape=record]
+	box0 [label="{<f0> Box 1:None}"]
+}

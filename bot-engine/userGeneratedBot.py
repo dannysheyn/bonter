@@ -52,7 +52,7 @@ class UserGeneratedBot:
         inlinekeyBoard = box_buttons[from_button]
         inlinekeyBoard.callback_data = str(destinationBox - 1)
 
-    def add_box(self, box_msg, box_type, api_obj):
+    def add_box(self, box_msg, box_type, api_obj=None):
         if self.state_key not in self.states:
             self.states[self.state_key] = []
         if self.box_type_api == box_type:

@@ -216,7 +216,7 @@ class BotEngine:
         box_msg = update.message.text
         user_generated_bot = self.generated_bots[update.effective_user.id]
         try:
-            box_number = user_generated_bot.add_text_box(box_msg)
+            box_number = user_generated_bot.add_box(box_msg, 'text')
             text = f'The box you created has the number of {box_number}'
         except:
             text = 'Invalid box number was given. please try again'
@@ -285,7 +285,7 @@ class BotEngine:
         if request.status_code == 200:
             text = "Nice!\n" \
                    "Now we need to get the query parameters that this endpoint expects to get\n" \
-                   "Please write key value pairs separated by comma (For example: destination:israel, origin:Germany)\n" \
+                   "Please write key value pairs separated by & (For example: destination=israel&origin=Germany)\n" \
                    "The request will be made according to the values the end user will input\n" \
                    "If there are no query parameters type None"
             # Should we infer the button text from the endpoint or ask the user
@@ -336,17 +336,16 @@ class BotEngine:
             pretty_response = json.dumps(pretty_response, indent=2)
             if len(pretty_response) > 4000:
                 pretty_response = self.trim_long_response(json.dumps(pretty_response, indent=2))
-            text = "We just made a request with the parameters that you provided" \
+            text = "We just made a request with the parameters that you provided " \
                    "and got the following response\n\n" \
                    f"{pretty_response}"
-            text_get_key = "What keys would you like to show the user from this response?\n" \
+            text_get_key = "What keys would you like to show the user from this response?\n " \
                            "Write Json expressions which evaluate to your keys separated by commas, for example: [origin], " \
-                           "[destination][flight_num], etc..." \
+                           "[destination][flight_num], etc...\n " \
                            "If the key is inside an array you need to index it, for example: [0][origin], " \
                            "[destination][1]\n" \
                            "You can use nesting for dictionaries as well, for example: [data][name], [0][data][time]\n" \
-                           "You can also type in expressions which are arrays and we will get all the keys there" \
-                           "If you want all the response to be displayed type ALL"
+                           "You can also type in expressions which are arrays and we will get all the keys there\n" \
 
             # In general expression maps to the value of the key
             update.message.reply_text(text=text)
@@ -358,6 +357,8 @@ class BotEngine:
             update.message.reply_text(text=text)
             return self.get_query_params(update, context)
 
+
+
     def get_keys_to_retrieve(self, update: Update, context: CallbackContext):
         expressions = [expression.strip() for expression in update.message.text.split(',')]
         user_generated_bot = self.generated_bots[update.effective_user.id]
@@ -367,7 +368,7 @@ class BotEngine:
             user_generated_bot.apis[-1].validate_keys()
         except Exception as e:
             error_message = "We couldn't validate one of your expressions\n" \
-                            f"Original error is: {e}\n" \
+                            f"Original error is: \n {e}\n" \
                             f"Please try to write those expressions again according to the rules"
             update.message.reply_text(text=error_message)
             return self.get_keys_to_retrieve(update, context)
@@ -377,7 +378,7 @@ class BotEngine:
                         "Here is the key-expression mapping (In this format {Key} = {Expression}):\n" \
                         f"{key_expression_mapping}"
         next_stage_text = "How would you like to present the data to the user?\n" \
-                          "notice that you can reference a key like this ${key}, " \
+                          "notice that you can reference a key like this ${key},\n " \
                           "And we will get the value out of the expression that matches the key at run time\n" \
                           "For example: Your flight leaves at ${time} from ${destination} to ${origin}"
 
@@ -389,10 +390,11 @@ class BotEngine:
         user_generated_bot = self.generated_bots[update.effective_user.id]
         # TODO: Validate that this is a valid message
         user_generated_bot.apis[-1].message_to_user = update.message.text
-        user_generated_bot.add_box(box_msg=None, box_type='api', api_obj=user_generated_bot.apis[-1])
+        box_number = user_generated_bot.add_box(box_msg=None, box_type='api', api_obj=user_generated_bot.apis[-1])
+        text = f'The API Endpoint was created successfully\n ' \
+               f'The box you created has the number of {box_number}'
         # if not valid message recursively come back to this function
         # else we finish the process and create new callbackquery handler
-        text = "The API Endpoint was created successfully"
         update.message.reply_text(text=text)
         return self.main_menu(update, context)
 
@@ -428,7 +430,7 @@ ADD_API_BOX = 32
 
 
 def main():
-    mainbot = BotEngine(bot_name='engineBot', bot_api_key="1489264800:AAEgoIvqwoN3K1UZL6ghTY5ixZvUcl6qI_E",
+    mainbot = BotEngine(bot_name='engineBot', bot_api_key="1743828272:AAF_0DG0-bjmp5nb6TvjcaYXU08EHvTchQQ",
                         conv_handler=None)
     dispatcher = mainbot.updater.dispatcher
     conv_handler = ConversationHandler(
