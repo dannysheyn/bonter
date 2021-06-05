@@ -245,6 +245,7 @@ class BotEngine:
         except Exception as e:
             print(e)
             text = 'Invalid box number was given. please try again'
+            update.message.reply_text(text=text)
             return self.main_menu(update, context)
         update.message.reply_text(text=text)
         return ADD_BOX_BUTTON3
@@ -270,7 +271,7 @@ class BotEngine:
     def start_api_flow(self, update: Update, context: CallbackContext):
         query = update.callback_query
         query.answer()
-        text = "We will now ask you some basic questions regarding" \
+        text = "We will now ask you some basic questions regarding " \
                "your API endpoint\n\n" \
                "What is the base endpoint of the API you want to integrate"
         query.message.reply_text(text=text)
@@ -314,10 +315,11 @@ class BotEngine:
     #     return GET_QUERY_PARAMS
 
     def trim_long_response(self, response):
-        start = f'{response[0:100]}'
+        start = f'{response[0:1000]}'
         mid = '.\n.\n.\n.\n.\n.\n.\n'
-        end = f'{response[-100:-1]}'
-        return f'{start}{mid}{end}'
+        return f'{start}{mid}'
+        # end = f'{response[-100:-1]}'
+        # return f'{start}{mid}{end}'
 
     def get_query_params(self, update: Update, context: CallbackContext):
         # First validate that it matches the desired pattern
@@ -339,10 +341,10 @@ class BotEngine:
             text = "We just made a request with the parameters that you provided " \
                    "and got the following response\n\n" \
                    f"{pretty_response}"
-            text_get_key = "What keys would you like to show the user from this response?\n " \
+            text_get_key = "What keys would you like to show the user from this response?\n" \
                            "Write Json expressions which evaluate to your keys separated by commas, for example: [origin], " \
                            "[destination][flight_num], etc...\n " \
-                           "If the key is inside an array you need to index it, for example: [0][origin], " \
+                           "If the key are inside an array you need to index it, for example: [0][origin], " \
                            "[destination][1]\n" \
                            "You can use nesting for dictionaries as well, for example: [data][name], [0][data][time]\n" \
                            "You can also type in expressions which are arrays and we will get all the keys there\n" \
@@ -355,7 +357,7 @@ class BotEngine:
             text = f"We got a {request.status_code} response code from this uri with those parameters" \
                    "Please make sure you passed the right parameters and try again\n"
             update.message.reply_text(text=text)
-            return self.get_query_params(update, context)
+            return GET_QUERY_PARAMS
 
 
 
@@ -371,7 +373,7 @@ class BotEngine:
                             f"Original error is: \n {e}\n" \
                             f"Please try to write those expressions again according to the rules"
             update.message.reply_text(text=error_message)
-            return self.get_keys_to_retrieve(update, context)
+            return GET_KEY_FROM_RESPONSE
 
         key_expression_mapping = user_generated_bot.apis[-1].key_expression_map()
         ref_keys_text = "Your keys have been validated and we have saved them\n" \
@@ -390,7 +392,15 @@ class BotEngine:
         user_generated_bot = self.generated_bots[update.effective_user.id]
         # TODO: Validate that this is a valid message
         user_generated_bot.apis[-1].message_to_user = update.message.text
-        box_number = user_generated_bot.add_box(box_msg=None, box_type='api', api_obj=user_generated_bot.apis[-1])
+        if user_generated_bot.apis[-1].query_params is None:
+            box_number = user_generated_bot.add_box(box_msg=None, box_type='api', api_obj=user_generated_bot.apis[-1])
+        else:
+            question = "Please provide us with the following query parameters values: \n"
+            box_number = user_generated_bot.add_box(box_msg=question, box_type=UserGeneratedBot.box_type_question
+                                                    , api_obj=user_generated_bot.apis[-1])
+            user_generated_bot.add_box(box_msg=None, box_type=UserGeneratedBot.box_type_follow_up,
+                                       api_obj=user_generated_bot.apis[-1])
+            user_generated_bot.add_box(box_msg=None, box_type='api', api_obj=user_generated_bot.apis[-1])
         text = f'The API Endpoint was created successfully\n ' \
                f'The box you created has the number of {box_number}'
         # if not valid message recursively come back to this function
