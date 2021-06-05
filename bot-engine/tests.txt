@@ -2,4 +2,10 @@
 
 https://jsonplaceholder.typicode.com/posts
 
-userId=1
+userId=1&id=2
+
+[0]["title"], [0]["body"]
+
+
+Hello user your book name is ${title} and here is the story:
+${body}

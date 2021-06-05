@@ -29,12 +29,20 @@ class API:
         # Expressions give us the path to the value
         # For now we assume key is the last key in the expression
 
+    def parse_query_params(self, query_params):
+        key_values = query_params.split(',')
+
+        for key_value in key_values:
+            key, value = key_value.split('=')
+            self.query_params[key] = value
+
     def get_api_response(self):
         response = requests.get(self.uri, params=self.query_params, headers={"Authorization": self.authorization})
         return response
 
     def validate_keys(self, save_response=False):
-        for expression in self.expressions: # [0][text][2][time]
+        for expression in self.expressions: # ["title"], ["body"]
+            expression = expression.replace('"', '')
             elements = re.findall(r"\[([A-Za-z0-9_]+)\]", expression)
             response_json = self.get_api_response()
             response = json.loads(response_json.text)

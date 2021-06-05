@@ -1,13 +1,14 @@
 from telegram import InlineKeyboardButton
-from telegram.ext import CallbackQueryHandler, CommandHandler
-from datetime import datetime
-from callableBox import CallableAPI, CallablePrint, TimerAction
+from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, Filters
+from callableBox import *
 from showBot import botToPicture, bot_edge, bot_node
 
 
 class UserGeneratedBot:
     box_type_api = 'api'
     box_type_text = 'text'
+    box_type_question= 'question'
+    box_type_follow_up = 'follow_up'
 
     def __init__(self, bot_username=None, bot_api_key=None, conv_handler=None):
         self.bot_username = bot_username
@@ -59,14 +60,18 @@ class UserGeneratedBot:
             self.states[self.state_key].append(
                 CallbackQueryHandler(CallableAPI(msg=box_msg, api=api_obj),
                                      pattern='^' + str(self.pattern) + '$'))
-        if self.box_type_text == box_type:
+        if self.box_type_question == box_type:
             self.states[self.state_key].append(
-                CallbackQueryHandler(CallablePrint(msg=box_msg),
-                                     pattern='^' + str(self.pattern) + '$')
-            )
+                    MessageHandler(Filters.text, CallableQuestion(api_obj, box_msg)))
+
+        if self.box_type_follow_up == box_type:
+            self.states[self.state_key].append(
+                MessageHandler(Filters.text, CallableFollowUp(api_obj, box_msg)))
+
         self.nodes[self.pattern] = bot_node(self.pattern, box_msg)
         self.pattern += 1
         return self.pattern
+
 
     def add_box_button(self, box_number, button_text):
         callbackqueryArray = self.states[self.state_key]
@@ -92,8 +97,11 @@ class UserGeneratedBot:
         callbackqueryArray = self.states[self.state_key]
         pattern = '^' + str(box_number) + '$'
         for callback in callbackqueryArray:
-            if callback.pattern.pattern == pattern:
-                return True
+            try:
+                if callback.pattern.pattern == pattern:
+                    return True
+            except Exception as e:
+                continue
         return False
 
     def show_bot(self, file_name='111'):

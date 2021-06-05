@@ -1,11 +1,7 @@
 from telegram import Update, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
-from datetime import datetime
+from api import *
 
-
-def send_msg(context: CallbackContext):
-    job = context.job
-    context.bot.send_message(job.context, text='Beep!')
 
 
 class ExtendedAction:
@@ -78,6 +74,42 @@ class CallablePrint:
     @staticmethod
     def __name__():
         return 'callable print class'
+
+
+class CallableQuestion(CallablePrint):
+    def __init__(self, obj, question, next_state=1):
+        super().__init__(question, next_state)
+        self.obj = obj
+
+    def __call__(self, update, context):
+        update = self.check_query(update, context)
+
+        if isinstance(self.obj, API):
+            self.msg += ', '.join(['{0}'.format(k) for k in self.obj.query_params.keys()])
+        update.message.reply_text(text=self.msg)
+        return self.next_state
+
+
+# Query Params example:
+# Question = "Please enter the query params"
+# Expected Answer = key=value, key=value
+
+
+class CallableFollowUp(CallablePrint):
+    def __init__(self, obj, answer, next_state=1):
+        super().__init__(next_state)
+        self.obj = obj
+
+    def __call__(self, update, context):
+        update = self.check_query(update, context)
+        answer = update.message.text
+
+        # validate answer according to pattern
+
+        if isinstance(self.obj, API):
+            self.obj.parse_query_params(answer)
+
+        return self.next_state
 
 
 class CallableAPI(CallablePrint):
