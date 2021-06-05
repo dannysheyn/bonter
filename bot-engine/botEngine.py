@@ -11,7 +11,7 @@ from telegram.ext import (
     Handler, CallbackQueryHandler,
 )
 import requests
-
+from datetime import datetime
 from api import API
 from callback import *
 import re
@@ -27,6 +27,8 @@ import os
 #  and looking into how to upgrade the fetures in the bot engine ( at least add command to a command) i.e nested commands.
 # TODO: maybe api action?
 # TODO: defult end bot,
+# -1) make demo cryptobot
+# error handing api, recurrsion in wrong requests
 # 0) intigrate the new api feature into the bot-engine
 # 1) API , visualisation
 # 2) aswer with .. (text,image, voice?)
@@ -103,6 +105,7 @@ class BotEngine:
                 [InlineKeyboardButton("Add box", callback_data=str(CHOOSE_BOX))],
                 [InlineKeyboardButton("Add edge", callback_data=str(ADD_EDGE))],
                 [InlineKeyboardButton("Add box button", callback_data=str(ADD_BOX_BUTTON))],
+                [InlineKeyboardButton("Add timed action", callback_data=str(TIMER_ACTION))],
                 [InlineKeyboardButton("Print bot", callback_data=str(PRINT_BOT))],
                 [InlineKeyboardButton("End building bot", callback_data=str(END))],
                 [InlineKeyboardButton("Help", callback_data=str(HELP))],
@@ -314,9 +317,9 @@ class BotEngine:
     #     return GET_QUERY_PARAMS
 
     def trim_long_response(self, response):
-        start = f'{response[0:100]}'
+        start = f'{response[1:100]}'
         mid = '.\n.\n.\n.\n.\n.\n.\n'
-        end = f'{response[-100:-1]}'
+        end = f'{response[-100:-2]}'
         return f'{start}{mid}{end}'
 
     def get_query_params(self, update: Update, context: CallbackContext):
@@ -346,7 +349,7 @@ class BotEngine:
                            "[destination][1]\n" \
                            "You can use nesting for dictionaries as well, for example: [data][name], [0][data][time]\n" \
                            "You can also type in expressions which are arrays and we will get all the keys there\n" \
-
+ \
             # In general expression maps to the value of the key
             update.message.reply_text(text=text)
             update.message.reply_text(text=text_get_key)
@@ -356,8 +359,6 @@ class BotEngine:
                    "Please make sure you passed the right parameters and try again\n"
             update.message.reply_text(text=text)
             return self.get_query_params(update, context)
-
-
 
     def get_keys_to_retrieve(self, update: Update, context: CallbackContext):
         expressions = [expression.strip() for expression in update.message.text.split(',')]
@@ -401,6 +402,48 @@ class BotEngine:
     def get_authorization_header(self, update: Update, context: CallbackContext):
         pass
 
+    def timer_action(self, update: Update, context: CallbackContext):
+        user_generated_bot = self.generated_bots[update.effective_user.id]
+        query = update.callback_query
+        query.answer()
+        text = 'The timer will be activated from when the moment the user will reach that timer-action-box.\n' \
+               'Here is your bot, please choose the box to give it the time-action ability.'
+        file_path = user_generated_bot.show_bot(file_name=str(update.effective_user.id))
+        query.message.reply_photo(photo=open(file_path, 'rb'), caption=text)
+        return TIMER_ACTION2
+
+    def timer_action2(self, update: Update, context: CallbackContext):
+        user_generated_bot = self.generated_bots[update.effective_user.id]
+        user_box_selected = int(update.message.text)
+        valid_box = user_generated_bot.is_valid_box(user_box_selected)
+        if valid_box:
+            user_generated_bot.user_variables['box-timer'] = valid_box
+            update.message.reply_text(text='Please enter the interval and finish time for this polling\n'
+                                           'Interval in seconds, finish time in DD/MM/YYYY\n'
+                                           'Example: 10')
+            return TIMER_ACTION3
+        else:
+            update.message.reply_text(text='Wrong box was given please try again')
+            return TIMER_ACTION2
+
+    def timer_action3(self, update: Update, context: CallbackContext):
+        user_generated_bot = self.generated_bots[update.effective_user.id]
+        inetrval_endtime = update.message.text
+        try:
+            # inetrval_endtime = inetrval_endtime.split(',')
+            # inetrval_endtime = [i.strip() for i in inetrval_endtime]
+            #endtime = datetime.strptime(inetrval_endtime[1], '%d/%m/%Y')
+            interval = int(inetrval_endtime)
+            user_generated_bot.attach_timer_to_box(user_generated_bot.user_variables['box-timer'],
+                                                   interval)
+        except Exception as s:
+            print(s)
+        return self.main_menu(update, context)
+
+
+# 3
+# times to run, start , interval, finish , action/box. outcome?
+#
 
 ADD_START = 1
 ADD_QUESTION = 2
@@ -427,10 +470,13 @@ START_API_FLOW = 29
 CHOOSE_BOX = 30
 BOX_DECISION = 31
 ADD_API_BOX = 32
+TIMER_ACTION2 = 33
+TIMER_ACTION3 = 34
+TIMER_ACTION = 35
 
 
 def main():
-    mainbot = BotEngine(bot_name='engineBot', bot_api_key="1743828272:AAF_0DG0-bjmp5nb6TvjcaYXU08EHvTchQQ",
+    mainbot = BotEngine(bot_name='engineBot', bot_api_key="1489264800:AAEgoIvqwoN3K1UZL6ghTY5ixZvUcl6qI_E",
                         conv_handler=None)
     dispatcher = mainbot.updater.dispatcher
     conv_handler = ConversationHandler(
@@ -444,6 +490,8 @@ def main():
                 CallbackQueryHandler(mainbot.add_edge, pattern='^' + str(ADD_EDGE) + '$'),
                 CallbackQueryHandler(mainbot.print_bot, pattern='^' + str(PRINT_BOT) + '$'),
                 CallbackQueryHandler(mainbot.end_build_bot, pattern='^' + str(END) + '$'),
+                CallbackQueryHandler(mainbot.timer_action, pattern='^' + str(TIMER_ACTION) + '$'),
+
             ],
             BOX_DECISION: [
                 CallbackQueryHandler(mainbot.add_text_box, pattern='^' + str(ADD_TEXT_BOX) + '$'),
@@ -458,6 +506,8 @@ def main():
             ADD_EDGE2: [MessageHandler(Filters.text, mainbot.add_edge2)],
             ADD_BOX_BUTTON2: [MessageHandler(Filters.text, mainbot.add_box_button2)],
             ADD_BOX_BUTTON3: [MessageHandler(Filters.text, mainbot.add_box_button3)],
+            TIMER_ACTION2: [MessageHandler(Filters.text, mainbot.timer_action2)],
+            TIMER_ACTION3: [MessageHandler(Filters.text, mainbot.timer_action3)],
         },
         fallbacks=[CommandHandler('cancel', mainbot.start)],
     )
@@ -471,3 +521,8 @@ if __name__ == '__main__':
 
 # Daniel : 1489264800:AAEgoIvqwoN3K1UZL6ghTY5ixZvUcl6qI_E
 # Artem : 1743828272:AAF_0DG0-bjmp5nb6TvjcaYXU08EHvTchQQ
+
+# public apis: https://github.com/public-apis/public-apis
+# https://api.coincap.io/v2/assets  bitcoin api
+
+#stam bot : 1729539488:AAFxZf8IItBf8dcrNUIW2albguVpHUvm5TU

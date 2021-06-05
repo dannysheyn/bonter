@@ -1,7 +1,7 @@
 from telegram import InlineKeyboardButton
 from telegram.ext import CallbackQueryHandler, CommandHandler
-
-from callableBox import CallableAPI, CallablePrint
+from datetime import datetime
+from callableBox import CallableAPI, CallablePrint, TimerAction
 from showBot import botToPicture, bot_edge, bot_node
 
 
@@ -96,5 +96,14 @@ class UserGeneratedBot:
                 return True
         return False
 
-    def show_bot(self, file_name):
+    def show_bot(self, file_name='111'):
         return self.bot_pic.render_graph(self.nodes.values(), self.edges, file_name)
+
+    def attach_timer_to_box(self, box_number, interval):
+        callbackqueryArray = self.states[self.state_key]
+        box_number -= 1
+        box_callback = callbackqueryArray[box_number].callback
+        box_callback.set_timer = TimerAction(box_callback, False, params={'interval': interval})
+
+
+

@@ -53,7 +53,7 @@ class API:
                     element = int(element)
                     if isinstance(response, list) and not (0 <= int(element) < len(response)):
                         raise IndexError(f"In the expression {expression} the index {element} does not exist in the list")
-                    if isinstance(response, dict) :
+                    if isinstance(response, dict):
                         raise KeyError(f"In the expression {expression} The key {element} is not a valid key in "
                                        f"this dictionary context")
                 response = response[element]

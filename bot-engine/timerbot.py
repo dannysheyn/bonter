@@ -34,10 +34,15 @@ def start(update: Update, _: CallbackContext) -> None:
     update.message.reply_text('Hi! Use /set <seconds> to set a timer')
 
 
-def alarm(context: CallbackContext) -> None:
-    """Send the alarm message."""
-    job = context.job
-    context.bot.send_message(job.context, text='Beep!')
+class Alarm:
+    def alarm(self, context: CallbackContext) -> None:
+        """Send the alarm message."""
+        job = context.job
+        args = context.args
+        context.bot.send_message(job.context, text='beep')
+
+
+alarm = Alarm()
 
 
 def remove_job_if_exists(name: str, context: CallbackContext) -> bool:
@@ -59,9 +64,8 @@ def set_timer(update: Update, context: CallbackContext) -> None:
         if due < 0:
             update.message.reply_text('Sorry we can not go back to future!')
             return
-
         job_removed = remove_job_if_exists(str(chat_id), context)
-        context.job_queue.run_once(alarm, due, context=chat_id, name=str(chat_id))
+        context.job_queue.run_once(alarm.alarm, due, context=chat_id, name=str(chat_id))
 
         text = 'Timer successfully set!'
         if job_removed:
