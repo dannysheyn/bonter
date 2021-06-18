@@ -1,0 +1,20 @@
+# -1) make demo cryptobot
+# error handing api, recurrsion in wrong requests
+# 0) intigrate the new api feature into the bot-engine
+# 1) API , visualisation
+# 2) aswer with .. (text,image, voice?)
+# 3) impove chat flow, UI UX...
+# 4) edit bot: remove edge, remove box, remove button
+# 4) timer
+# 5) Basic Api integrations with calender, gmail
+# 6) deploy ,check if bot works with multiple users /clients ,
+# 7) bot mangenment system?
+# 7) data visualisation
+# dinamic text , , poll? , group admin? , ,
+# Haloka:
+# 1) Adding a few commands
+# 2) nested commands
+# 3) command type
+# 4) better UX/UI - improve botEngine convo and user freindly
+# 5) DB
+# press here to learn more

@@ -27,30 +27,38 @@ import os
 #  and looking into how to upgrade the fetures in the bot engine ( at least add command to a command) i.e nested commands.
 # TODO: maybe api action?
 # TODO: defult end bot,
-# -1) make demo cryptobot
-# error handing api, recurrsion in wrong requests
-# 0) intigrate the new api feature into the bot-engine
-# 1) API , visualisation
-# 2) aswer with .. (text,image, voice?)
-# 3) impove chat flow, UI UX...
-# 4) edit bot: remove edge, remove box, remove button
-# 4) timer
-# 5) Basic Api integrations with calender, gmail
-# 6) deploy ,check if bot works with multiple users /clients ,
-# 7) bot mangenment system?
-# 7) data visualisation
-# dinamic text , , poll? , group admin? , ,
-# Haloka:
-# 1) Adding a few commands
-# 2) nested commands
-# 3) command type
-# 4) better UX/UI - improve botEngine convo and user freindly
-# 5) DB
-# press here to learn more
 
+
+# Save database of users (identify user by api key probably or userid) , get all the bots of the users, edit bots.
+# maybe add another layer of menu before.
+# build db, module of th db, ,new menu , new menu features
+#
+# Save parameters and then use them for later use(pooling of parameters that we can get from api responses maybe,
+# and the use them afterwards). variable as in user input.
+# question -> param type -> regex? -> condition?
+# ${products} = get all products...
+# here are the products: ${products}
+# callable question
+#
+# Adding timed action to button instead of box.
+#    Then if you have 2 buttons to the same box they will have different behavior.
+#
+# Leting the client decide which query params are pre defined and which are up to the user. (add features to query
+# params)
+#
+#
+# Send logs of user activity to our server and save the logs, to be able to present to the client.
+#
+# Start the conversation without /start
+#
+# Add init box that can initiate variables and other stuff
+#
+# make timer box\button visible to the user
+#
+#
 # Plan: mannage one state with multipyl callbackquery handlers
 #
-#
+
 from userGeneratedBot import UserGeneratedBot
 
 
@@ -509,7 +517,6 @@ def main():
                 CallbackQueryHandler(mainbot.print_bot, pattern='^' + str(PRINT_BOT) + '$'),
                 CallbackQueryHandler(mainbot.end_build_bot, pattern='^' + str(END) + '$'),
                 CallbackQueryHandler(mainbot.timer_action, pattern='^' + str(TIMER_ACTION) + '$'),
-
             ],
             BOX_DECISION: [
                 CallbackQueryHandler(mainbot.add_text_box, pattern='^' + str(ADD_TEXT_BOX) + '$'),
