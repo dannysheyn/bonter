@@ -7,7 +7,7 @@ from showBot import botToPicture, bot_edge, bot_node
 class UserGeneratedBot:
     box_type_api = 'api'
     box_type_text = 'text'
-    box_type_question= 'question'
+    box_type_question = 'question'
     box_type_follow_up = 'follow_up'
 
     def __init__(self, bot_username=None, bot_api_key=None, conv_handler=None):
@@ -20,6 +20,7 @@ class UserGeneratedBot:
         self.states = {}  # build on the go
         self.fallbacks = []  # build on the go
         self.state_key = 1
+        self.message_handler_key = '1'
         self.commands = []
         self.button_key = 0
         self.build_button = {}
@@ -62,16 +63,34 @@ class UserGeneratedBot:
                                      pattern='^' + str(self.pattern) + '$'))
         if self.box_type_question == box_type:
             self.states[self.state_key].append(
-                    MessageHandler(Filters.text, CallableQuestion(api_obj, box_msg)))
-
-        if self.box_type_follow_up == box_type:
+                CallbackQueryHandler(CallableQuestion(api_obj, box_msg, next_state=self.message_handler_key)))
+        if self.box_type_text == box_type:
             self.states[self.state_key].append(
-                MessageHandler(Filters.text, CallableFollowUp(api_obj, box_msg)))
+                CallbackQueryHandler(CallablePrint(msg=box_msg),
+                                     pattern='^' + str(self.pattern) + '$'))
 
         self.nodes[self.pattern] = bot_node(self.pattern, box_msg)
         self.pattern += 1
         return self.pattern
 
+    def add_state(self, obj=None, return_callback=None):
+        self.states[self.message_handler_key] = [MessageHandler(filters=Filters.text, callback=CallableFollowUp(
+            obj=obj,
+            next_state=return_callback))
+            ]
+        self.message_handler_key = str(int(self.message_handler_key) + 1)
+
+    def find_return_callabck(self, box_number):
+        box_number -= 1
+        callbackqueryArray = self.states[self.state_key]
+        pattern = '^' + str(box_number) + '$'
+        for callback in callbackqueryArray:
+            try:
+                if callback.pattern.pattern == pattern:
+                    return callback.callback
+            except Exception as e:
+                continue
+        return None
 
     def add_box_button(self, box_number, button_text):
         callbackqueryArray = self.states[self.state_key]
@@ -112,6 +131,3 @@ class UserGeneratedBot:
         box_number -= 1
         box_callback = callbackqueryArray[box_number].callback
         box_callback.set_timer = TimerAction(box_callback, False, params={'interval': interval})
-
-
-

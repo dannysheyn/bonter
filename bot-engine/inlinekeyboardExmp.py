@@ -20,7 +20,7 @@ from telegram.ext import (
     CommandHandler,
     CallbackQueryHandler,
     ConversationHandler,
-    CallbackContext,
+    CallbackContext, MessageHandler, Filters,
 )
 
 # Enable logging
@@ -48,7 +48,7 @@ def start(update: Update, _: CallbackContext) -> int:
     keyboard = [
         [
             InlineKeyboardButton("1", callback_data=str(ONE)),
-            InlineKeyboardButton("2", callback_data=str(TWO)),
+            #InlineKeyboardButton("2", callback_data=str(TWO)),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -79,10 +79,14 @@ def start_over(update: Update, _: CallbackContext) -> int:
     return FIRST
 
 
-def one(update: Update, _: CallbackContext) -> int:
+def one(update: Update, _: CallbackContext):
     """Show new choice of buttons"""
-    query = update.callback_query
-    query.answer()
+    if update.callback_query is None:
+        query = update
+    else:
+        query = update.callback_query
+        query.answer()
+
     keyboard = [
         [ #1.1->2 , 2.2->3
             InlineKeyboardButton("3", callback_data=str(THREE)), #-> 1
@@ -93,7 +97,7 @@ def one(update: Update, _: CallbackContext) -> int:
     query.edit_message_text(
         text="First CallbackQueryHandler, Choose a route", reply_markup=reply_markup
     )
-    return FIRST # return next_state()
+    return 'firstFollowUp'  # return next_state()
 
 
 def two(update: Update, _: CallbackContext) -> int:
@@ -158,6 +162,11 @@ def end(update: Update, _: CallbackContext) -> int:
     return ConversationHandler.END
 
 
+def query_followup(update: Update, context: CallbackContext):
+    text = update.message.text
+    update.message.reply_text(text=text)
+    return two(update, context)
+
 def main() -> None:
     # Create the Updater and pass it your bot's token.
     updater = Updater("1489264800:AAEgoIvqwoN3K1UZL6ghTY5ixZvUcl6qI_E")
@@ -179,7 +188,9 @@ def main() -> None:
                 CallbackQueryHandler(two, pattern='^' + str(TWO) + '$'),
                 CallbackQueryHandler(three, pattern='^' + str(THREE) + '$'),
                 CallbackQueryHandler(four, pattern='^' + str(FOUR) + '$'),
+                # MessageHandler(Filters.regex('^2:'), two),
             ],
+            'firstFollowUp': [MessageHandler(Filters.text, query_followup)],
             SECOND: [
                 CallbackQueryHandler(start_over, pattern='^' + str(ONE) + '$'),
                 CallbackQueryHandler(end, pattern='^' + str(TWO) + '$'),

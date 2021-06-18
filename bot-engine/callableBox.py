@@ -1,7 +1,8 @@
+import collections
+
 from telegram import Update, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 from api import *
-
 
 
 class ExtendedAction:
@@ -85,7 +86,8 @@ class CallableQuestion(CallablePrint):
         update = self.check_query(update, context)
 
         if isinstance(self.obj, API):
-            self.msg += ', '.join(['{0}'.format(k) for k in self.obj.query_params.keys()])
+            self.msg += ', '.join(['{0}=inset your value here'.format(k) for k in self.obj.query_params.keys()])
+            self.msg += '\n in the format above.'
         update.message.reply_text(text=self.msg)
         return self.next_state
 
@@ -96,20 +98,23 @@ class CallableQuestion(CallablePrint):
 
 
 class CallableFollowUp(CallablePrint):
-    def __init__(self, obj, answer, next_state=1):
-        super().__init__(next_state)
+    def __init__(self, obj=None, answer=None, next_state=None):
+        super().__init__(next_state=next_state)
         self.obj = obj
 
     def __call__(self, update, context):
         update = self.check_query(update, context)
         answer = update.message.text
 
-        # validate answer according to pattern
+        # validate answer according to patter
 
         if isinstance(self.obj, API):
             self.obj.parse_query_params(answer)
 
-        return self.next_state
+        if isinstance(self.next_state, collections.Callable):
+            return self.next_state(update, context)
+        else:
+            return self.next_state
 
 
 class CallableAPI(CallablePrint):

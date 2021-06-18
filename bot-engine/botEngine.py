@@ -326,11 +326,12 @@ class BotEngine:
     def get_query_params(self, update: Update, context: CallbackContext):
         # First validate that it matches the desired pattern
         # key:value, key:value ...
-        query_params = [key_value.strip() for key_value in update.message.text.split('&')]
         user_generated_bot = self.generated_bots[update.effective_user.id]
-        for query_param in query_params:
-            key, value = query_param.split("=", 1)
-            user_generated_bot.apis[-1].query_params[key] = value
+        if update.message.text != 'None':
+            query_params = [key_value.strip() for key_value in update.message.text.split('&')]
+            for query_param in query_params:
+                key, value = query_param.split("=", 1)
+                user_generated_bot.apis[-1].query_params[key] = value
 
         request = user_generated_bot.apis[-1].get_api_response()
         # Validate it's a Json response, currently we will support only Json
@@ -351,7 +352,7 @@ class BotEngine:
                            "You can use nesting for dictionaries as well, for example: [data][name], [0][data][time]\n" \
                            "You can also type in expressions which are arrays and we will get all the keys there\n" \
  \
-            # In general expression maps to the value of the key
+                # In general expression maps to the value of the key
             update.message.reply_text(text=text)
             update.message.reply_text(text=text_get_key)
             return GET_KEY_FROM_RESPONSE
@@ -392,17 +393,24 @@ class BotEngine:
         user_generated_bot = self.generated_bots[update.effective_user.id]
         # TODO: Validate that this is a valid message
         user_generated_bot.apis[-1].message_to_user = update.message.text
-        if user_generated_bot.apis[-1].query_params is None:
-            box_number = user_generated_bot.add_box(box_msg=None, box_type='api', api_obj=user_generated_bot.apis[-1])
+        text = f'The API Endpoint was created successfully\n ' \
+               f'The box you created has the number of: '
+        if not user_generated_bot.apis[-1].query_params:
+            box_number = user_generated_bot.add_box(box_msg='api call', box_type='api', api_obj=user_generated_bot.apis[-1])
+            text += str(box_number)
         else:
             question = "Please provide us with the following query parameters values: \n"
             box_number = user_generated_bot.add_box(box_msg=question, box_type=UserGeneratedBot.box_type_question
                                                     , api_obj=user_generated_bot.apis[-1])
-            user_generated_bot.add_box(box_msg=None, box_type=UserGeneratedBot.box_type_follow_up,
-                                       api_obj=user_generated_bot.apis[-1])
-            user_generated_bot.add_box(box_msg=None, box_type='api', api_obj=user_generated_bot.apis[-1])
-        text = f'The API Endpoint was created successfully\n ' \
-               f'The box you created has the number of {box_number}'
+
+            api_box_number = user_generated_bot.add_box(box_msg='Make api call', box_type='api',
+                                                        api_obj=user_generated_bot.apis[-1])
+            box_button_num = user_generated_bot.add_box_button(box_number, 'Get user query params')
+            user_generated_bot.add_edge((box_number, box_button_num), api_box_number)
+            api_box_callback = user_generated_bot.find_return_callabck(api_box_number)
+            user_generated_bot.add_state(obj=user_generated_bot.apis[-1], return_callback=api_box_callback)
+            text += str(box_number)
+            text += f'\nand {api_box_number}# for the api box'
         # if not valid message recursively come back to this function
         # else we finish the process and create new callbackquery handler
         update.message.reply_text(text=text)
@@ -428,7 +436,7 @@ class BotEngine:
         if valid_box:
             user_generated_bot.user_variables['box-timer'] = valid_box
             update.message.reply_text(text='Please enter the interval and finish time for this polling\n'
-                                           'Interval in seconds, finish time in DD/MM/YYYY\n'
+                                           'Interval in seconds\n'
                                            'Example: 10')
             return TIMER_ACTION3
         else:
@@ -441,10 +449,11 @@ class BotEngine:
         try:
             # inetrval_endtime = inetrval_endtime.split(',')
             # inetrval_endtime = [i.strip() for i in inetrval_endtime]
-            #endtime = datetime.strptime(inetrval_endtime[1], '%d/%m/%Y')
+            # endtime = datetime.strptime(inetrval_endtime[1], '%d/%m/%Y')
             interval = int(inetrval_endtime)
             user_generated_bot.attach_timer_to_box(user_generated_bot.user_variables['box-timer'],
                                                    interval)
+            update.message.reply_text(text='Timer attached successfully!')
         except Exception as s:
             print(s)
         return self.main_menu(update, context)
@@ -534,4 +543,4 @@ if __name__ == '__main__':
 # public apis: https://github.com/public-apis/public-apis
 # https://api.coincap.io/v2/assets  bitcoin api
 
-#stam bot : 1729539488:AAFxZf8IItBf8dcrNUIW2albguVpHUvm5TU
+# stam bot : 1729539488:AAFxZf8IItBf8dcrNUIW2albguVpHUvm5TU
