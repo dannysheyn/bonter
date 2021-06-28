@@ -29,6 +29,8 @@ import os
 # TODO: defult end bot,
 
 
+# problems: after query params insert no moveing on to the next questin and text is being added.
+
 # Save database of users (identify user by api key probably or userid) , get all the bots of the users, edit bots.
 # maybe add another layer of menu before.
 # build db, module of th db, ,new menu , new menu features
@@ -210,6 +212,7 @@ class BotEngine:
             [
                 [InlineKeyboardButton("Add text box", callback_data=str(ADD_TEXT_BOX))],
                 [InlineKeyboardButton("Add API fetch box", callback_data=str(ADD_API_BOX))],
+                [InlineKeyboardButton("Add User given variable", callback_data=str(ADD_USER_VARIABLE))],
             ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         query.message.edit_text(text=text, reply_markup=reply_markup)
@@ -404,7 +407,8 @@ class BotEngine:
         text = f'The API Endpoint was created successfully\n ' \
                f'The box you created has the number of: '
         if not user_generated_bot.apis[-1].query_params:
-            box_number = user_generated_bot.add_box(box_msg='api call', box_type='api', api_obj=user_generated_bot.apis[-1])
+            box_number = user_generated_bot.add_box(box_msg='api call', box_type='api',
+                                                    api_obj=user_generated_bot.apis[-1])
             text += str(box_number)
         else:
             question = "Please provide us with the following query parameters values: \n"
@@ -415,7 +419,7 @@ class BotEngine:
                                                         api_obj=user_generated_bot.apis[-1])
             box_button_num = user_generated_bot.add_box_button(box_number, 'Get user query params')
             user_generated_bot.add_edge((box_number, box_button_num), api_box_number)
-            api_box_callback = user_generated_bot.find_return_callabck(api_box_number)
+            api_box_callback = user_generated_bot.find_return_callback(api_box_number)
             user_generated_bot.add_state(obj=user_generated_bot.apis[-1], return_callback=api_box_callback)
             text += str(box_number)
             text += f'\nand {api_box_number}# for the api box'
@@ -455,15 +459,62 @@ class BotEngine:
         user_generated_bot = self.generated_bots[update.effective_user.id]
         inetrval_endtime = update.message.text
         try:
-            # inetrval_endtime = inetrval_endtime.split(',')
-            # inetrval_endtime = [i.strip() for i in inetrval_endtime]
-            # endtime = datetime.strptime(inetrval_endtime[1], '%d/%m/%Y')
             interval = int(inetrval_endtime)
             user_generated_bot.attach_timer_to_box(user_generated_bot.user_variables['box-timer'],
                                                    interval)
             update.message.reply_text(text='Timer attached successfully!')
         except Exception as s:
             print(s)
+        return self.main_menu(update, context)
+
+    def add_user_variable_box(self, update: Update, context: CallbackContext):
+        query = update.callback_query
+        query.answer()
+        text = 'Variables are values you get from the user from free text, you can reference them the following way:\n' \
+               'Let''s say i obtained the name of the user and defined it to the variable name of ''user_name''.' \
+               'You can now reference that variable the following way: (any where you input text to the bot)' \
+               '''Hi ${user_name} nice to meet you!''' \
+               'The end user will see the following string: ''Hi John nice to meet you!'''
+        query.message.reply_text(text=text)
+
+        query.message.reply_text(text='Please enter the question you will ask the user.'
+                                       'Examples: ' \
+                                       'Please enter your name:' \
+                                       'How old are you?' \
+                                       'What is your oder id?')
+        return USER_VARIABLE2
+
+    def add_user_variable_box2(self, update: Update, context: CallbackContext):
+        client_variable = update.message.text
+        user_generated_bot = self.generated_bots[update.effective_user.id]
+        user_generated_bot.user_variables['question'] = client_variable
+        #
+        update.message.reply_text(text='Please enter the variable name that will store the user''s answer'
+                                       'Example: The variable ''user_name'', ''user_age''')
+        return USER_VARIABLE3
+
+    def add_user_variable_box3(self, update: Update, context: CallbackContext):
+        variable_name = update.message.text
+        user_generated_bot = self.generated_bots[update.effective_user.id]
+        question = user_generated_bot.user_variables['question']
+        if variable_name in user_generated_bot.client_variables:
+            update.message.reply_text(text=f'The variable "{variable_name}" is already in use, try a different name')
+            return USER_VARIABLE
+        else:
+            user_generated_bot.client_variables.add(variable_name)
+            # create the box flow of the question -> answer
+            question_box_number = user_generated_bot.add_box(box_msg=question, box_type=user_generated_bot.box_type_question)
+            box_button_num = user_generated_bot.add_box_button(question_box_number, 'Get user variable value')
+            user_answer_box_number = user_generated_bot.add_state(obj={'variable_name': variable_name}, add_as_box=True)
+            user_generated_bot.add_edge((question_box_number, box_button_num), user_answer_box_number)
+
+        update.message.reply_text(text=f'Two boxes have been created:'
+                                       f'first: box number {question_box_number} that asks: {question}\n'
+                                       f'second: box number {user_answer_box_number} that gets the answer from the '
+                                       f'user and inserts it into {variable_name}\n '
+                                       f'that can be referenced by typing ${{{variable_name}}} anywhere in the bot\n'
+                                       f'NOTE: You can only use this variable after the user submitted his response.')
+
         return self.main_menu(update, context)
 
 
@@ -499,7 +550,10 @@ ADD_API_BOX = 32
 TIMER_ACTION2 = 33
 TIMER_ACTION3 = 34
 TIMER_ACTION = 35
-
+USER_VARIABLE = 36
+USER_VARIABLE2 = 37
+USER_VARIABLE3 = 38
+ADD_USER_VARIABLE = 39
 
 def main():
     mainbot = BotEngine(bot_name='engineBot', bot_api_key="1489264800:AAEgoIvqwoN3K1UZL6ghTY5ixZvUcl6qI_E",
@@ -521,6 +575,7 @@ def main():
             BOX_DECISION: [
                 CallbackQueryHandler(mainbot.add_text_box, pattern='^' + str(ADD_TEXT_BOX) + '$'),
                 CallbackQueryHandler(mainbot.start_api_flow, pattern='^' + str(ADD_API_BOX) + '$'),
+                CallbackQueryHandler(mainbot.add_user_variable_box, pattern='^' + str(ADD_USER_VARIABLE) + '$'),
             ],
             GET_BASE_API: [MessageHandler(Filters.text, mainbot.get_base_api)],
             # GET_ENDPOINT: [MessageHandler(Filters.text, mainbot.get_endpoint)],
@@ -533,6 +588,10 @@ def main():
             ADD_BOX_BUTTON3: [MessageHandler(Filters.text, mainbot.add_box_button3)],
             TIMER_ACTION2: [MessageHandler(Filters.text, mainbot.timer_action2)],
             TIMER_ACTION3: [MessageHandler(Filters.text, mainbot.timer_action3)],
+
+            USER_VARIABLE2: [MessageHandler(Filters.text, mainbot.add_user_variable_box2)],
+            USER_VARIABLE3: [MessageHandler(Filters.text, mainbot.add_user_variable_box3)],
+
         },
         fallbacks=[CommandHandler('cancel', mainbot.start)],
     )

@@ -38,12 +38,14 @@ class CallablePrint:
         self.next_state = next_state
         self.reply_buttons = []
         self.set_timer = timer_action
+        self.variables = {}
         self.__name__ = 'callable print class'
 
     def add_button(self, button):
         self.reply_buttons.append(button)
 
     def check_query(self, update: Update, context: CallbackContext):
+        self.update_msg(update, context)
         if hasattr(update, 'callback_query'):
             query = update.callback_query
             if query is not None:
@@ -76,6 +78,18 @@ class CallablePrint:
     def __name__():
         return 'callable print class'
 
+    def update_msg(self, update, context):
+        msg = None
+        match = r'\$\{([A-Za-z0-9_]+)\}'
+        if 'questions' in context.user_data:
+            question_dict = context.user_data['questions']
+            if question_dict != {} and self.msg is not None:
+                variables = re.findall(match, self.msg)
+                for var in variables:
+                    if var in question_dict:
+                        msg = re.sub(match, question_dict[var], self.msg, 1)
+        return msg or self.msg
+
 
 class CallableQuestion(CallablePrint):
     def __init__(self, obj, question, next_state=1):
@@ -84,11 +98,15 @@ class CallableQuestion(CallablePrint):
 
     def __call__(self, update, context):
         update = self.check_query(update, context)
-
+        question = self.msg
         if isinstance(self.obj, API):
-            self.msg += ', '.join(['{0}=inset your value here'.format(k) for k in self.obj.query_params.keys()])
-            self.msg += '\n in the format above.'
-        update.message.reply_text(text=self.msg)
+            question += ', '.join(['{0}=inset your value here'.format(k) for k in
+                                   self.obj.query_params.keys()])  ## text being multiplied self.msg =
+            question += '\n in the format above.'
+        else:  # this is a question
+            if 'questions' not in context.user_data:
+                context.user_data['questions'] = {}
+        update.message.reply_text(text=question)
         return self.next_state
 
 
@@ -98,19 +116,22 @@ class CallableQuestion(CallablePrint):
 
 
 class CallableFollowUp(CallablePrint):
-    def __init__(self, obj=None, answer=None, next_state=None):
+    def __init__(self, obj=None, answer=None, next_state=None, box_number=-1):
         super().__init__(next_state=next_state)
         self.obj = obj
+        self.box_number = box_number
 
     def __call__(self, update, context):
         update = self.check_query(update, context)
         answer = update.message.text
-
+        # context.user_data[]
         # validate answer according to patter
 
         if isinstance(self.obj, API):
             self.obj.parse_query_params(answer)
-
+        else:
+            variable_identifier = self.obj['variable_name']
+            context.user_data['questions'][variable_identifier] = answer
         if isinstance(self.next_state, collections.Callable):
             return self.next_state(update, context)
         else:

@@ -1,4 +1,4 @@
-from graphviz import Digraph, nohtml
+from graphviz import Digraph, nohtml, Source
 
 
 class bot_edge:
@@ -12,10 +12,23 @@ class bot_edge:
 
 
 class bot_node:
-    def __init__(self, box, msg=''):
+    def __init__(self, box, msg='', callback=None, query_handler=None, message_handler=None, state_value=None,
+                 box_type=None):
         self.box = box
         self.msg = msg
         self.button_list = []
+        self.query_handler = query_handler
+        self.message_handler = message_handler
+        self.state_value = state_value
+        self.callback = self.callback()
+        self.box_type = box_type
+
+    def callback(self):
+        return None
+        if self.query_handler:
+            return self.query_handler.callback
+        else:
+            return self.message_handler.callback
 
 
 class botToPicture:
@@ -29,7 +42,8 @@ class botToPicture:
         graph_string_nodes = self.create_nodes_render_string(bot_nodes)
         graph_string_edges = self.create_edge_render_list(bot_edges)
         for node, buttons in graph_string_nodes:
-            self.graph.node(node, nohtml(buttons))
+            self.graph.node(node, color='red',
+                            image='stopwatch16x16.png')#,nohtml(buttons), )
         for from_box, dest_box in graph_string_edges:
             self.graph.edge(from_box, dest_box)
         pic_path = self.graph.render(filename=bot_user_name, view=False, format='png')
@@ -48,6 +62,16 @@ class botToPicture:
         return edges_render_string
 
     @staticmethod
+    def escape_msg(msg: str):
+        escaped_msg = ''
+        for index, char in enumerate(msg):
+            if char == '{' or char == '}':
+                escaped_msg += '\\' + char
+            else:
+                escaped_msg += char
+        return escaped_msg
+
+    @staticmethod
     def create_nodes_render_string(_nodes: [bot_node]):
         node_strings = ['' for _ in _nodes]
         box_strings = []
@@ -55,7 +79,7 @@ class botToPicture:
             box = node.box
             box_strings.append(f'box{node.box}')
             last_item_index = len(node.button_list) - 1
-            node_strings[i] += f'{{<f0> Box {box + 1}:{node.msg}'  # maybe node.action?
+            node_strings[i] += f'{{<f0> Box {box + 1}:{botToPicture.escape_msg(node.msg)}'  # maybe node.action?
             if last_item_index == -1:
                 node_strings[i] += '}'
             for j, button in enumerate(node.button_list):
@@ -70,3 +94,10 @@ class botToPicture:
                 else:
                     node_strings[i] += f'|{box_text}'
         return list(zip(box_strings, node_strings))  # [('box0', '{<f0> Box 1 |{<f1>1.1|<f2>1.2|<f3>1.3}}')]
+
+# g = botToPicture()
+# g.render_graph([bot_node(1, 'asd')], [], '11')
+path = '11'
+s = Source.from_file(path, format='png')
+s.view()
+
