@@ -12,11 +12,7 @@ import json
 # how does the client choose how to show to user an array?
 
 class API:
-    response = None
-
-    def __init__(self, uri=None, query_params=None, authorization=None, expressions=None):
-        if query_params is None:
-            query_params = {}
+    def __init__(self, uri=None, query_params={}, authorization=None, expressions=None):
         self.uri = uri
         self.query_params = query_params # will change based on end user
         self.authorization = authorization

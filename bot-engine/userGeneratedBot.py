@@ -3,29 +3,31 @@ from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, F
 from callableBox import *
 from showBot import botToPicture, bot_edge, bot_node
 
+BOX_TYPE_API = 'api'
+BOX_TYPE_TEXT = 'text'
+BOX_TYPE_QUESTION = 'question'
+BOX_TYPE_FOLLOW_UP = 'follow_up'
+
 
 class UserGeneratedBot:
-    box_type_api = 'api'
-    box_type_text = 'text'
-    box_type_question = 'question'
-    box_type_follow_up = 'follow_up'
 
-    def __init__(self, bot_username=None, bot_api_key=None, conv_handler=None):
+    # TODO: Change this long constructor and create an Object
+    def __init__(self, bot_username=None, api_key=None, conv_handler=None):
+
         self.bot_username = bot_username
-        self.bot_api_key = bot_api_key
+        self.api_key = api_key
         self.conv_handler = conv_handler
-        self.updater = None  # Updater(bot_api_key, use_context=True)
+        self.updater = None  # Updater(api_key, use_context=True)
         self.dispatcher = None
         self.entry_points = []  # build on the go /start /hi
         self.states = {}  # build on the go
-        self.fallbacks = []  # build on the go
         self.state_key = 1
         self.message_handler_key = '1'
         self.commands = []
-        self.button_key = 0
         self.build_button = {}
-        self.edges = set()
-        self.nodes = {}
+        self.button_key = 0
+        # self.bot_pic.bot_edges = set()
+        # self.bot_pic.bot_nodes = {}
         self.pattern = 0
         self.bot_pic = botToPicture()
         self.user_variables = {}
@@ -41,12 +43,12 @@ class UserGeneratedBot:
         # (1,2), 2  1.2->2
 
     def add_edge(self, fromBox: tuple, destinationBox):
-        # self.edges.add((1, 2, 2))
+        # self.bot_pic.bot_edges.add((1, 2, 2))
         box = fromBox[0] - 1
         from_button = fromBox[1] - 1
         new_edge = bot_edge(box, from_button, destinationBox - 1)
-        if new_edge not in self.edges:
-            self.edges.add(new_edge)
+        if new_edge not in self.bot_pic.bot_edges:
+            self.bot_pic.bot_edges.add(new_edge)
         else:
             raise Exception('Cannot add the same edge twice')
         box_callback = self.states[self.state_key][box].callback
@@ -57,27 +59,27 @@ class UserGeneratedBot:
     def add_box(self, box_msg, box_type, api_obj=None):
         if self.state_key not in self.states:
             self.states[self.state_key] = []
-        if self.box_type_api == box_type:
+        if BOX_TYPE_API == box_type:
             self.states[self.state_key].append(
-                CallbackQueryHandler(CallableAPI(msg=box_msg, api=api_obj),
+                CallbackQueryHandler(CallableAPI(msg=box_msg, obj=api_obj),
                                      pattern='^' + str(self.pattern) + '$'))
-        if self.box_type_question == box_type:
+        if BOX_TYPE_QUESTION == box_type:
             self.states[self.state_key].append(
                 CallbackQueryHandler(CallableQuestion(api_obj, box_msg, next_state=self.message_handler_key)))
-        if self.box_type_text == box_type:
+        if BOX_TYPE_TEXT == box_type:
             self.states[self.state_key].append(
                 CallbackQueryHandler(CallablePrint(msg=box_msg),
                                      pattern='^' + str(self.pattern) + '$'))
 
-        self.nodes[self.pattern] = bot_node(self.pattern, box_msg)
+        self.bot_pic.bot_nodes[self.pattern] = bot_node(self.pattern, box_msg)
         self.pattern += 1
         return self.pattern
 
-    def add_state(self, obj=None, return_callback=None):
+    def add_message_handler_state(self, obj=None, return_callback=None):
         self.states[self.message_handler_key] = [MessageHandler(filters=Filters.text, callback=CallableFollowUp(
             obj=obj,
             next_state=return_callback))
-            ]
+                                                 ]
         self.message_handler_key = str(int(self.message_handler_key) + 1)
 
     def find_return_callabck(self, box_number):
@@ -95,7 +97,7 @@ class UserGeneratedBot:
     def add_box_button(self, box_number, button_text):
         callbackqueryArray = self.states[self.state_key]
         box_number -= 1
-        node = self.nodes[box_number]
+        node = self.bot_pic.bot_nodes[box_number]
         node.button_list.append(button_text)
         callbackqueryArray[box_number].callback.add_button(
             InlineKeyboardButton(button_text)
@@ -124,7 +126,7 @@ class UserGeneratedBot:
         return False
 
     def show_bot(self, file_name='111'):
-        return self.bot_pic.render_graph(self.nodes.values(), self.edges, file_name)
+        return self.bot_pic.render_graph(self.bot_pic.bot_nodes.values(), self.bot_pic.bot_edges, file_name)
 
     def attach_timer_to_box(self, box_number, interval):
         callbackqueryArray = self.states[self.state_key]

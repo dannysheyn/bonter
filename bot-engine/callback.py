@@ -17,7 +17,8 @@ class Callback:
         else:
             self.replay_buttons.append(button)
 
-    def check_query(self, update: Update, context: CallbackContext):
+    @staticmethod
+    def check_query(update: Update, context: CallbackContext):
         query = update.callback_query
         if query is not None:
             query.answer()
@@ -35,7 +36,7 @@ class Start(Callback):
 
 class Button(Callback):
     def __call__(self, update: Update, context: CallbackContext):
-        update = self.check_query(update, context)
+        update = Callback.check_query(update, context)
         if self.replay_buttons:
             print(self.replay_buttons)
             keyboard = ReplyKeyboardMarkup(self.replay_buttons)
@@ -59,16 +60,8 @@ class Answer:
         else:
             self.replay_buttons.append(button)
 
-    def check_query(self, update: Update, context: CallbackContext):
-        query = update.callback_query
-        if query is not None:
-            query.answer()
-            return query
-        else:
-            return update
-
     def __call__(self, update: Update, context: CallbackContext):
-        update = self.check_query(update, context)
+        update = Callback.check_query(update, context)
         if self.replay_buttons:
             print(self.replay_buttons)
             keyboard = ReplyKeyboardMarkup(self.replay_buttons)

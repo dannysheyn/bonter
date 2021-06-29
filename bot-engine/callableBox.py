@@ -3,6 +3,7 @@ import collections
 from telegram import Update, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 from api import *
+from callback import Callback
 
 
 class ExtendedAction:
@@ -43,21 +44,13 @@ class CallablePrint:
     def add_button(self, button):
         self.reply_buttons.append(button)
 
-    def check_query(self, update: Update, context: CallbackContext):
-        if hasattr(update, 'callback_query'):
-            query = update.callback_query
-            if query is not None:
-                query.answer()
-                return query
-        return update
-
     def extend(self, update, context):
         if self.set_timer is not None:
             if not self.set_timer.activated:
                 self.set_timer(update, context, self)
 
     def __call__(self, update: Update, context: CallbackContext):
-        update = self.check_query(update, context)
+        update = Callback.check_query(update, context)
         self.extend(update, context)
         if self.reply_buttons:
             print(self.reply_buttons)
@@ -83,7 +76,7 @@ class CallableQuestion(CallablePrint):
         self.obj = obj
 
     def __call__(self, update, context):
-        update = self.check_query(update, context)
+        update = Callback.check_query(update, context)
 
         if isinstance(self.obj, API):
             self.msg += ', '.join(['{0}=inset your value here'.format(k) for k in self.obj.query_params.keys()])
@@ -103,7 +96,7 @@ class CallableFollowUp(CallablePrint):
         self.obj = obj
 
     def __call__(self, update, context):
-        update = self.check_query(update, context)
+        update = Callback.check_query(update, context)
         answer = update.message.text
 
         # validate answer according to patter
@@ -118,16 +111,16 @@ class CallableFollowUp(CallablePrint):
 
 
 class CallableAPI(CallablePrint):
-    def __init__(self, api, msg, next_state=1):
+    def __init__(self, obj, msg, next_state=1):
         super().__init__(msg, next_state)
-        self.api = api
+        self.obj = obj
         self.msg = 'API fetch box'
 
     def __call__(self, update: Update, context: CallbackContext):
-        update = self.check_query(update, context)
+        update = Callback.check_query(update, context)
         self.extend(update, context)
-        self.api.parse_message_to_user()
-        text = self.api.message_to_user
+        self.obj.parse_message_to_user()
+        text = self.obj.message_to_user
         if self.reply_buttons:
             print(self.reply_buttons)
             keyboard = InlineKeyboardMarkup([self.reply_buttons])

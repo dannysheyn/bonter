@@ -10,6 +10,14 @@ class bot_edge:
     def __hash__(self):
         return hash(f'{self.box}{self.button}{self.destination}')
 
+    def __eq__(self, other):
+        if not isinstance(other, bot_edge):
+            # don't attempt to compare against unrelated types
+            return NotImplemented
+
+        return self.box == other.box and self.button == other.button \
+            and self.destination == other.destination
+
 
 class bot_node:
     def __init__(self, box, msg=''):
@@ -17,11 +25,22 @@ class bot_node:
         self.msg = msg
         self.button_list = []
 
+    def __eq__(self, other):
+        if not isinstance(other, bot_node):
+            # don't attempt to compare against unrelated types
+            return NotImplemented
+
+        return self.box == other.box and self.msg == other.msg
+
+    def __hash__(self):
+        # necessary for instances to behave sanely in dicts and sets.
+        return hash((self.box, self.msg))
+
 
 class botToPicture:
-    def __init__(self):
-        self.bot_nodes = []
-        self.bot_edges = []
+    def __init__(self, bot_nodes={}, bot_edges=set()):
+        self.bot_nodes = bot_nodes
+        self.bot_edges = bot_edges
         self.graph = None
 
     def render_graph(self, bot_nodes, bot_edges, bot_user_name):
