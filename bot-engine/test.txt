@@ -1,0 +1,84 @@
+
+
+1729539488:AAFxZf8IItBf8dcrNUIW2albguVpHUvm5TU
+hi, how can i help you???
+Products
+iphone3.....
+Hours
+9:00 - 10:00
+More..
+Samsung3
+
+1729539488:AAFxZf8IItBf8dcrNUIW2albguVpHUvm5TU
+hi im new bot
+1
+2
+1
+go to 2
+got to 1
+1.1->2
+2.1->1
+
+key of this callback: 0
+callback will say: iphone3.....
+callback will return: 1
+buttons are:
+	text:Products will return: 1
+	text:Main Menu will return: 3
+----------------------------------------------------------
+key of this callback: 0
+callback will say: hi, how can i help you???
+callback will return: 0
+buttons are:
+	text:Products will return: 1
+----------------------------------------------------------
+key of this callback: 1
+callback will say: AAAAAAAAAAAA
+callback will return: 1
+buttons are:
+	text:More.. will return: 3
+	text:Main Menu will return: 3
+----------------------------------------------------------
+key of this callback: 1
+callback will say: hi, how can i help you???
+callback will return: 0
+	buttons are:
+	text:Products will return: 1
+----------------------------------------------------------
+
+
+/start
+hi how can i help you?? <- entry point
+#press here to learn more
+--> please choose one: <- states 
+	[products]
+	
+	
+	
+	
+	
+1729539488:AAFxZf8IItBf8dcrNUIW2albguVpHUvm5TU
+https://api.coincap.io/v2/assets
+search=bitcoin&limit=5
+[data][0][id],[data][0][priceUsd]
+The coin ${id} is ${priceUsd}  USD!
+	
+	
+	
+	
+Please provide us with the following query parameters values:
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+
+
+
+

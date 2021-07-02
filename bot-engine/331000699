@@ -1,0 +1,9 @@
+digraph g {
+	node [shape=record]
+	box0 [label="{<f0> Box 1:name?|{<f1>1.1:Get user variable value}}"]
+	box1 [label="{<f0> Box 2:user input of variable \"user_name\"}"]
+	box2 [label="{<f0> Box 3:hi $\{user_name\}|{<f1>3.1:go to 1}}"]
+	box1:f0 -> box2:f0
+	box2:f1 -> box0:f0
+	box0:f1 -> box1:f0
+}

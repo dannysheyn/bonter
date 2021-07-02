@@ -48,17 +48,22 @@ def get_bot(client, api_key: str, user_id: str):
 
 
 def decode_states(states):
+    state_string = ''
     raw_states = defaultdict(list)
     for key, state in states.items():
         if key == 1:
             # add type of callable
             for query_handler in state:
                 raw_states["query_handlers"].append(my_dict(query_handler.callback))
+                if hasattr(query_handler.callback, 'obj'):
+                    raw_states["query_handlers"][-1]['obj_type'] = type(query_handler.callback.obj).__name__
                 raw_states["query_handlers"][-1]["callback_type"] = type(query_handler.callback).__name__
         else:
             raw_states["message_handlers"].append(
                 my_dict(state[0].callback))  # Because MessageHandler is in the form of [MessageHandler]
             raw_states["message_handlers"][-1]["callback_type"] = type(state[0].callback).__name__
+            if hasattr(state[0].callback, 'obj'):
+                raw_states["query_handlers"][-1]['obj_type'] = type(state[0].callback.obj).__name__
     return raw_states
 
 
@@ -75,7 +80,7 @@ def create_bot_dict(user_generated_bot: userGeneratedBot):
         "states": decode_states(user_generated_bot.states),
         #"pattern": user_generated_bot.pattern,
         "api_endpoints": api_endpoints,
-        "bot_pic": decode_bot_pic(my_dict(user_generated_bot.bot_pic))
+        "bot_pic": decode_bot_pic(my_dict(user_generated_bot.bot_graph))
 
     }
     return bot_data

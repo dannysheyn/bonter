@@ -31,6 +31,8 @@ import os
 # TODO: maybe api action?
 # TODO: defult end bot,
 
+# problems: fix obj and obj type issues
+# working demo of a bot from start to save.
 
 # Save database of users (identify user by api key probably or userid) , get all the bots of the users, edit bots.
 # maybe add another layer of menu before.
@@ -98,14 +100,18 @@ class BotEngine:
 
 
     def create_callback(self, handler, message_handler_key):
-        if handler["callback_type"] != CALLABLE_PRINT:
-            obj = API(uri=handler["obj"], query_params=handler["obj"]["query_params"], expressions=handler["obj"]["expressions"])
-            obj.message_to_user = handler["obj"]["message_to_user"]
-            obj.key_expression = handler["obj"]["key_expression"]
+        obj = None
+        if handler["callback_type"] != CALLABLE_PRINT and handler["obj"] is not None:
+            if handler["obj_type"] == 'API':
+                obj = API(uri=handler["obj"], query_params=handler["obj"]["query_params"],
+                          expressions=handler["obj"]["expressions"])
+                obj.message_to_user = handler["obj"]["message_to_user"]
+                obj.key_expression = handler["obj"]["key_expression"]
+            else:  # dict
+                obj = handler["obj"]
 
         if handler["callback_type"] == CALLABLE_QUESTION:
-                callback = CallableQuestion(obj, handler["msg"], next_state=message_handler_key)
-
+            callback = CallableQuestion(obj, handler["msg"], next_state=message_handler_key)
         elif handler["callback_type"] == CALLABLE_API:
             callback = CallableAPI(msg=handler["msg"], obj=obj)
 
@@ -113,7 +119,7 @@ class BotEngine:
             callback = CallablePrint(msg=handler["msg"])
 
         elif handler["callback_type"] == CALLABLE_FOLLOWUP:
-            callback = CallableFollowUp(obj=obj, next_state= handler["next_state"])
+            callback = CallableFollowUp(obj=obj, next_state=handler["next_state"])
 
         callback.reply_buttons = handler["reply_buttons"]
         return callback
@@ -163,7 +169,7 @@ class BotEngine:
         bot.add_starting_point(raw_bot["entry_point_message"])
         bot.apis = self.retrieve_api_endpoints(raw_bot["api_endpoints"])
         #bot.message_handler_key = message_handler_key
-        bot.bot_pic = self.retrieve_bot_pic(raw_bot["bot_pic"])
+        bot.bot_graph = self.retrieve_bot_pic(raw_bot["bot_pic"])
         bot.updater = Updater(token=bot.api_key, use_context=True)
         bot.dispatcher = bot.updater.dispatcher
         bot.conv_handler = ConversationHandler(
@@ -233,7 +239,7 @@ class BotEngine:
             else:
                 update.message.reply_text("We couldn't find a bot with this API key in your account\n"
                                           "Please try again")
-                return GET_BOT
+                return self.main_menu(update, context)
         else:
             update.message.reply_text('You have entered a wrong api key, please enter a valid one.')
             return GET_BOT
@@ -364,6 +370,7 @@ class BotEngine:
             [
                 [InlineKeyboardButton("Add text box", callback_data=str(ADD_TEXT_BOX))],
                 [InlineKeyboardButton("Add API fetch box", callback_data=str(ADD_API_BOX))],
+                [InlineKeyboardButton("Add User given variable", callback_data=str(ADD_USER_VARIABLE))],
             ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         query.message.edit_text(text=text, reply_markup=reply_markup)
@@ -550,7 +557,7 @@ class BotEngine:
         update.message.reply_text(text=ref_keys_text)
         update.message.reply_text(text=next_stage_text)
         return GET_MESSAGE_TO_USER
-
+ #curr=[userid][currntbot = number ], curr_bot = [uid][curr]
     def get_message_to_user(self, update: Update, context: CallbackContext):
         user_generated_bot = self.current_user_bot
         # TODO: Validate that this is a valid message
@@ -610,15 +617,62 @@ class BotEngine:
         user_generated_bot = self.current_user_bot
         inetrval_endtime = update.message.text
         try:
-            # inetrval_endtime = inetrval_endtime.split(',')
-            # inetrval_endtime = [i.strip() for i in inetrval_endtime]
-            # endtime = datetime.strptime(inetrval_endtime[1], '%d/%m/%Y')
             interval = int(inetrval_endtime)
             user_generated_bot.attach_timer_to_box(user_generated_bot.user_variables['box-timer'],
                                                    interval)
             update.message.reply_text(text='Timer attached successfully!')
         except Exception as s:
             print(s)
+        return self.edit_bot(update, context)
+
+    def add_user_variable_box(self, update: Update, context: CallbackContext):
+        query = update.callback_query
+        query.answer()
+        text = 'Variables are values you get from the user from free text, you can reference them the following way:\n' \
+               'Let''s say i obtained the name of the user and defined it to the variable name of ''user_name''.' \
+               'You can now reference that variable the following way: (any where you input text to the bot)' \
+               '''Hi ${user_name} nice to meet you!''' \
+               'The end user will see the following string: ''Hi John nice to meet you!'''
+        query.message.reply_text(text=text)
+
+        query.message.reply_text(text='Please enter the question you will ask the user.'
+                                       'Examples: ' \
+                                       'Please enter your name:' \
+                                       'How old are you?' \
+                                       'What is your oder id?')
+        return USER_VARIABLE2
+
+    def add_user_variable_box2(self, update: Update, context: CallbackContext):
+        client_variable = update.message.text
+        user_generated_bot = self.current_user_bot
+        user_generated_bot.user_variables['question'] = client_variable
+        #
+        update.message.reply_text(text='Please enter the variable name that will store the user''s answer'
+                                       'Example: The variable ''user_name'', ''user_age''')
+        return USER_VARIABLE3
+
+    def add_user_variable_box3(self, update: Update, context: CallbackContext):
+        variable_name = update.message.text
+        user_generated_bot = self.current_user_bot
+        question = user_generated_bot.user_variables['question']
+        if variable_name in user_generated_bot.client_variables:
+            update.message.reply_text(text=f'The variable "{variable_name}" is already in use, try a different name')
+            return USER_VARIABLE
+        else:
+            user_generated_bot.client_variables.add(variable_name)
+            # create the box flow of the question -> answer
+            question_box_number = user_generated_bot.add_box(box_msg=question, box_type=BOX_TYPE_QUESTION)
+            box_button_num = user_generated_bot.add_box_button(question_box_number, 'Get user variable value')
+            user_answer_box_number = user_generated_bot.add_message_handler_state(obj={'variable_name': variable_name}, add_as_box=True)
+            user_generated_bot.add_edge((question_box_number, box_button_num), user_answer_box_number)
+
+        update.message.reply_text(text=f'Two boxes have been created:'
+                                       f'first: box number {question_box_number} that asks: {question}\n'
+                                       f'second: box number {user_answer_box_number} that gets the answer from the '
+                                       f'user and inserts it into {variable_name}\n '
+                                       f'that can be referenced by typing ${{{variable_name}}} anywhere in the bot\n'
+                                       f'NOTE: You can only use this variable after the user submitted his response.')
+
         return self.edit_bot(update, context)
 
 
@@ -658,14 +712,17 @@ ADD_API_BOX = 32
 TIMER_ACTION2 = 33
 TIMER_ACTION3 = 34
 TIMER_ACTION = 35
-
+USER_VARIABLE = 36
+USER_VARIABLE2 = 37
+USER_VARIABLE3 = 38
+ADD_USER_VARIABLE = 39
 
 def main():
     import os
     os.environ["PATH"] += os.pathsep + 'C:/Program Files/Graphviz/bin'
     client = pymongo.MongoClient(
         "mongodb+srv://ArtemK:Art7302it%21@cluster0.xfxqr.mongodb.net/Bonter?retryWrites=true&w=majority")
-    mainbot = BotEngine(bot_name='engineBot', api_key="1743828272:AAF_0DG0-bjmp5nb6TvjcaYXU08EHvTchQQ",
+    mainbot = BotEngine(bot_name='engineBot', api_key="1489264800:AAEgoIvqwoN3K1UZL6ghTY5ixZvUcl6qI_E",
                         conv_handler=None, mongo_client=client)
     dispatcher = mainbot.updater.dispatcher
     conv_handler = ConversationHandler(
@@ -690,9 +747,9 @@ def main():
             BOX_DECISION: [
                 CallbackQueryHandler(mainbot.add_text_box, pattern='^' + str(ADD_TEXT_BOX) + '$'),
                 CallbackQueryHandler(mainbot.start_api_flow, pattern='^' + str(ADD_API_BOX) + '$'),
+                CallbackQueryHandler(mainbot.add_user_variable_box, pattern='^' + str(ADD_USER_VARIABLE) + '$'),
             ],
             GET_BASE_API: [MessageHandler(Filters.text, mainbot.get_base_api)],
-            # GET_ENDPOINT: [MessageHandler(Filters.text, mainbot.get_endpoint)],
             GET_QUERY_PARAMS: [MessageHandler(Filters.text, mainbot.get_query_params)],
             GET_KEY_FROM_RESPONSE: [MessageHandler(Filters.text, mainbot.get_keys_to_retrieve)],
             GET_MESSAGE_TO_USER: [MessageHandler(Filters.text, mainbot.get_message_to_user)],
@@ -702,6 +759,10 @@ def main():
             ADD_BOX_BUTTON3: [MessageHandler(Filters.text, mainbot.add_box_button3)],
             TIMER_ACTION2: [MessageHandler(Filters.text, mainbot.timer_action2)],
             TIMER_ACTION3: [MessageHandler(Filters.text, mainbot.timer_action3)],
+
+            USER_VARIABLE2: [MessageHandler(Filters.text, mainbot.add_user_variable_box2)],
+            USER_VARIABLE3: [MessageHandler(Filters.text, mainbot.add_user_variable_box3)],
+
         },
         fallbacks=[CommandHandler('cancel', mainbot.start)],
     )
@@ -720,3 +781,5 @@ if __name__ == '__main__':
 # https://api.coincap.io/v2/assets  bitcoin api
 
 # stam bot : 1729539488:AAFxZf8IItBf8dcrNUIW2albguVpHUvm5TU
+#danie pymongo: ("mongodb+srv://Shaanan:F4a6aAcqzpCVM4Dy@cluster0.xfxqr.mongodb.net/Bonter?retryWrites=true&w=majority")
+#artem pymongo: "mongodb+srv://ArtemK:Art7302it%21@cluster0.xfxqr.mongodb.net/Bonter?retryWrites=true&w=majority"
