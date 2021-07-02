@@ -96,8 +96,8 @@ class botToPicture:
         return list(zip(box_strings, node_strings))  # [('box0', '{<f0> Box 1 |{<f1>1.1|<f2>1.2|<f3>1.3}}')]
 
 # g = botToPicture()
-# g.render_graph([bot_node(1, 'asd')], [], '11')
-path = '11'
-s = Source.from_file(path, format='png')
-s.view()
+# # g.render_graph([bot_node(1, 'asd')], [], '11')
+# path = '11'
+# s = Source.from_file(path, format='png')
+# s.view()
 

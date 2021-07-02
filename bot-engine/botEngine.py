@@ -28,7 +28,6 @@ import os
 # TODO: maybe api action?
 # TODO: defult end bot,
 
-
 # problems: after query params insert no moveing on to the next questin and text is being added.
 
 # Save database of users (identify user by api key probably or userid) , get all the bots of the users, edit bots.
@@ -578,7 +577,6 @@ def main():
                 CallbackQueryHandler(mainbot.add_user_variable_box, pattern='^' + str(ADD_USER_VARIABLE) + '$'),
             ],
             GET_BASE_API: [MessageHandler(Filters.text, mainbot.get_base_api)],
-            # GET_ENDPOINT: [MessageHandler(Filters.text, mainbot.get_endpoint)],
             GET_QUERY_PARAMS: [MessageHandler(Filters.text, mainbot.get_query_params)],
             GET_KEY_FROM_RESPONSE: [MessageHandler(Filters.text, mainbot.get_keys_to_retrieve)],
             GET_MESSAGE_TO_USER: [MessageHandler(Filters.text, mainbot.get_message_to_user)],
